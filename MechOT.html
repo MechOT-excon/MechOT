@@ -261,6 +261,7 @@ const S={
   role:null,tab:0,userName:'',userEmail:'',
   userSitio:'todos',
   eqFiltro:'',
+  areaFiltro:'todos',
   alerts:[],
   // local cache
   ots:[],equipos:[],tecnicos:[],compromisos:[],inspecciones:[],
@@ -276,10 +277,24 @@ const fmtDate=d=>d?new Date(d+'T12:00:00').toLocaleDateString('es-CL'):'';
 const fmtDT=d=>d?new Date(d).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
 const getEq=cod=>S.equipos.find(e=>e.codigo_interno===cod)||{codigo_interno:cod,nombre:cod,tipo:'—',marca:'—',modelo:'—',anio:'—',sucursal:'—'};
 const sitioBadge=s=>`<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(139,92,246,.1);color:#c4b5fd;border:1px solid rgba(139,92,246,.25);font-family:var(--fm)">${SITIO_LBL[s]||s}</span>`;
+
+const AREAS=['Habilitación','Venta','Repex'];
+const AREA_CFG={
+  'Habilitación':{col:'var(--acc2)', bg:'rgba(59,130,246,.12)', icon:'ti-tool'},
+  'Venta':       {col:'var(--acc3)', bg:'rgba(16,185,129,.12)', icon:'ti-tag'},
+  'Repex':       {col:'var(--warn)', bg:'rgba(249,115,22,.12)', icon:'ti-tools'},
+};
+const areaBadge=area=>{
+  const c=AREA_CFG[area]||{col:'var(--text2)',bg:'var(--bg3)'};
+  return `<span style="font-size:9px;padding:1px 7px;border-radius:10px;background:${c.bg};color:${c.col};border:1px solid ${c.col};font-family:var(--fm)">${area||'—'}</span>`;
+};
+
 function cm(id){document.getElementById(id).classList.add('hidden');}
 function visibleEquipos(){
-  if(S.userSitio==='todos') return S.equipos;
-  return S.equipos.filter(e=>e.sucursal===S.userSitio);
+  let eq=S.equipos;
+  if(S.userSitio!=='todos') eq=eq.filter(e=>e.sucursal===S.userSitio);
+  if(S.areaFiltro&&S.areaFiltro!=='todos') eq=eq.filter(e=>e.area===S.areaFiltro);
+  return eq;
 }
 function visibleOTs(){
   const cods=new Set(visibleEquipos().map(e=>e.codigo_interno));
@@ -1141,6 +1156,13 @@ function renderJefe(){
   const tabs=['Dashboard','OTs','Equipos','Compromisos','Cumplimiento'];
   document.getElementById('MC').innerHTML=`
     <div class="nt">${tabs.map((t,i)=>`<button class="ntb ${S.tab===i?'on':''}" onclick="setTab(${i})">${t}</button>`).join('')}</div>
+    ${S.tab<=2?`<div style="display:flex;gap:.3rem;margin-bottom:.65rem;overflow-x:auto">
+      ${['todos',...AREAS].map(a=>`<button class="btn bsm ${S.areaFiltro===a?'bp':''}" style="${S.areaFiltro===a?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
+        onclick="S.areaFiltro='${a}';renderRole()">
+        ${a==='todos'?'<i class="ti ti-layout-grid"></i> Todas':
+          `<i class="ti ${AREA_CFG[a]?.icon||'ti-circle'}" style="color:${AREA_CFG[a]?.col}"></i> ${a}`}
+      </button>`).join('')}
+    </div>`:''}
     <div id="TC"></div>`;
   [renderJefeDash,()=>document.getElementById('TC').innerHTML=otList(visibleOTs(),'openPlanDet'),renderEquipos,renderCompromisos,renderCumplimiento][S.tab](document.getElementById('TC'));
 }
@@ -1344,6 +1366,7 @@ function buildEqList(eqs, hoy, lunStr, domStr){
         <div style="font-size:11px;color:var(--text2)">${e.marca} ${e.modelo}</div>
         <div style="display:flex;gap:.35rem;margin-top:.25rem;flex-wrap:wrap;align-items:center">
           ${eqEstadoBadge(est)}
+          ${areaBadge(e.area)}
           <span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(139,92,246,.1);color:#c4b5fd;border:1px solid rgba(139,92,246,.25);font-family:var(--fm)">${e.sucursal}</span>
           ${com?`<span style="font-size:10px;color:${fechaCol};font-weight:500">${fmtDate(com.fecha_limite)} · ${fechaTxt}</span>`:''}
         </div>
@@ -1375,20 +1398,46 @@ function openEqDetail(cod){
       <div style="font-size:12px;color:var(--text2)">${e.marca} ${e.modelo}</div>
       <div style="display:flex;gap:.35rem;margin-top:.35rem;flex-wrap:wrap;align-items:center">
         ${eqEstadoBadge(est)}
+        ${areaBadge(e.area)}
         <span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(139,92,246,.1);color:#c4b5fd;border:1px solid rgba(139,92,246,.25);font-family:var(--fm)">${e.sucursal}</span>
         <span style="font-size:11px;color:var(--text3)">${e.tipo}</span>
       </div>
     </div>
 
-    <!-- ESTADO EQUIPO — solo Admin puede cambiar -->
+    <!-- FECHA COMPROMETIDA DESTACADA -->
+    ${com?`<div class="card" style="border-color:${com.fecha_limite<hoy?'rgba(239,68,68,.5)':com.fecha_limite<=new Date(new Date(hoy).setDate(new Date(hoy).getDate()+7)).toISOString().split('T')[0]?'rgba(245,158,11,.5)':'rgba(59,130,246,.3)'};margin-bottom:.65rem">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.2rem">Fecha compromiso de entrega</div>
+          <div style="font-size:20px;font-weight:600;font-family:var(--fm);color:${com.fecha_limite<hoy?'var(--danger)':com.fecha_limite<=new Date(new Date(hoy).setDate(new Date(hoy).getDate()+7)).toISOString().split('T')[0]?'var(--acc)':'var(--acc3)'}">${fmtDate(com.fecha_limite)}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:.15rem"><i class="ti ti-map-pin"></i> ${com.destino_envio}</div>
+        </div>
+        <div style="text-align:right">
+          ${com.fecha_limite<hoy?
+            `<div style="font-size:22px;font-weight:700;color:var(--danger);font-family:var(--fm)">${Math.abs(Math.round((new Date(com.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)))}d</div><div style="font-size:10px;color:var(--danger)">ATRASADO</div>`:
+            `<div style="font-size:22px;font-weight:700;color:var(--acc3);font-family:var(--fm)">${Math.round((new Date(com.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000))}</div><div style="font-size:10px;color:var(--text2)">días restantes</div>`}
+        </div>
+      </div>
+    </div>`:''}
+
+    <!-- ESTADO Y ÁREA — solo Admin puede cambiar -->
     ${S.role==='admin'?`<div class="card" style="margin-bottom:.65rem">
-      <div class="ct" style="margin-bottom:.5rem"><i class="ti ti-settings" style="color:var(--acc4)"></i> Estado del Equipo</div>
-      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+      <div class="ct" style="margin-bottom:.5rem"><i class="ti ti-settings" style="color:var(--acc4)"></i> Configuración del Equipo</div>
+      <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.3rem">Estado</div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.65rem">
         ${['En Proceso','Disponible','Entregado'].map(s=>`
           <button class="btn bsm ${est===s?'bs':''}" style="${est===s?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
             onclick="cambiarEstadoEquipo('${cod}','${s}')">
             ${s==='En Proceso'?'<i class="ti ti-tool"></i>':s==='Disponible'?'<i class="ti ti-circle-check"></i>':'<i class="ti ti-truck"></i>'}
             ${s}
+          </button>`).join('')}
+      </div>
+      <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.3rem">Área</div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        ${AREAS.map(a=>`
+          <button class="btn bsm" style="${(e.area||'Habilitación')===a?`background:${AREA_CFG[a]?.bg};color:${AREA_CFG[a]?.col};border:1px solid ${AREA_CFG[a]?.col}`:'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
+            onclick="cambiarAreaEquipo('${cod}','${a}')">
+            <i class="ti ${AREA_CFG[a]?.icon}"></i> ${a}
           </button>`).join('')}
       </div>
       ${est==='Disponible'?`<div style="margin-top:.5rem;font-size:11px;color:var(--acc3);background:rgba(16,185,129,.08);border-radius:6px;padding:.4rem .6rem"><i class="ti ti-info-circle"></i> Equipo listo para entrega — pendiente despacho</div>`:''}
@@ -1425,9 +1474,15 @@ async function cambiarEstadoEquipo(cod, nuevoEstado){
     const eq=S.equipos.find(e=>e.codigo_interno===cod);
     if(eq) eq.estado_equipo=nuevoEstado;
     openEqDetail(cod);
-    // Refrescar lista si está visible
-    const tc=document.getElementById('TC');
-    if(tc) renderRole();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function cambiarAreaEquipo(cod, nuevaArea){
+  try{
+    await supa.patch('equipos',`codigo_interno=eq.${cod}`,{area:nuevaArea});
+    const eq=S.equipos.find(e=>e.codigo_interno===cod);
+    if(eq) eq.area=nuevaArea;
+    openEqDetail(cod);
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -1454,6 +1509,13 @@ function renderAdmin(){
   const tabs=['KPIs','Usuarios','Equipos','Compromisos','Inspecciones'];
   document.getElementById('MC').innerHTML=`
     <div class="nt">${tabs.map((t,i)=>`<button class="ntb ${S.tab===i?'on':''}" onclick="setTab(${i})">${t}</button>`).join('')}</div>
+    ${S.tab===0||S.tab===2?`<div style="display:flex;gap:.3rem;margin-bottom:.65rem;overflow-x:auto">
+      ${['todos',...AREAS].map(a=>`<button class="btn bsm ${S.areaFiltro===a?'bp':''}" style="${S.areaFiltro===a?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
+        onclick="S.areaFiltro='${a}';renderRole()">
+        ${a==='todos'?'<i class="ti ti-layout-grid"></i> Todas':
+          `<i class="ti ${AREA_CFG[a]?.icon||'ti-circle'}" style="color:${AREA_CFG[a]?.col}"></i> ${a}`}
+      </button>`).join('')}
+    </div>`:''}
     <div id="TC"></div>`;
   [renderAdminKPIs,renderAdminUsuarios,renderEquipos,renderCompromisos,renderAdminInspecciones][S.tab](document.getElementById('TC'));
 }
@@ -1467,15 +1529,109 @@ function renderAdminKPIs(tc){
   const hE=ots.reduce((a,o)=>a+(o.horas_ejecutadas||0),0);
   const efic=hP?Math.round(hE/hP*100):0;
   const atras=ots.filter(o=>o.estado!=='finalizada'&&o.fecha_programada<hoy);
-  const comVenc=S.compromisos.filter(c=>c.estado!=='Entregado'&&c.fecha_limite<hoy);
   const ncTotal=S.inspecciones.reduce((a,i)=>a+(i.total_nc||0),0);
+  const areaActual=S.areaFiltro||'todos';
+  const eqBase=areaActual==='todos'?S.equipos:S.equipos.filter(e=>e.area===areaActual);
+  const comsBase=areaActual==='todos'?S.compromisos:S.compromisos.filter(c=>{
+    const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
+    return eq&&eq.area===areaActual;
+  });
+  const {lunStr,domStr}=getWeekRange();
+  const {nextLunStr,nextDomStr}=getNextWeekRange();
+  const coms=comsBase.filter(c=>c.estado!=='Entregado');
+  const comsAtras=coms.filter(c=>c.fecha_limite<hoy);
+  const comsSemana=coms.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr);
+  const comsProxSemana=coms.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr);
+  const eqEnProceso=eqBase.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso');
+  const eqDisponible=eqBase.filter(e=>e.estado_equipo==='Disponible');
+  const atrasosPorMes={};
+  comsAtras.forEach(c=>{
+    const mes=c.fecha_limite?c.fecha_limite.substring(0,7):'Sin fecha';
+    if(!atrasosPorMes[mes]) atrasosPorMes[mes]=[];
+    atrasosPorMes[mes].push(c);
+  });
+  const sucursales=['Lo Pinto','La Negra'];
+  const eqPorSuc=sucursales.map(s=>({
+    s,
+    total:eqBase.filter(e=>e.sucursal===s).length,
+    enProceso:eqBase.filter(e=>e.sucursal===s&&(e.estado_equipo||'En Proceso')==='En Proceso').length,
+    disponible:eqBase.filter(e=>e.sucursal===s&&e.estado_equipo==='Disponible').length,
+    atrasados:coms.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.sucursal===s&&c.fecha_limite<hoy;}).length,
+    semana:coms.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.sucursal===s&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;}).length,
+    proxSemana:coms.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.sucursal===s&&c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr;}).length,
+  }));
+  const porArea=areaActual==='todos'?AREAS.map(a=>({
+    a,
+    total:S.equipos.filter(e=>e.area===a).length,
+    enProceso:S.equipos.filter(e=>e.area===a&&(e.estado_equipo||'En Proceso')==='En Proceso').length,
+    disponible:S.equipos.filter(e=>e.area===a&&e.estado_equipo==='Disponible').length,
+    atrasados:S.compromisos.filter(c=>{
+      if(c.estado==='Entregado'||c.fecha_limite>=hoy) return false;
+      const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
+      return eq&&eq.area===a;
+    }).length,
+  })):[];
   tc.innerHTML=`
-    ${(atras.length||comVenc.length)?`<div class="card" style="border-color:rgba(239,68,68,.35);margin-bottom:.65rem">
+    ${(atras.length||comsAtras.length)?`<div class="card" style="border-color:rgba(239,68,68,.35);margin-bottom:.65rem">
       <div class="ct" style="color:var(--danger);margin-bottom:.3rem"><i class="ti ti-alert-triangle"></i> Atención Requerida</div>
       ${atras.length?`<div style="font-size:12px;color:var(--danger)">${atras.length} OT(s) atrasada(s)</div>`:''}
-      ${comVenc.length?`<div style="font-size:12px;color:var(--danger)">${comVenc.length} compromiso(s) vencido(s)</div>`:''}
-    </div>`:''}
-    <div class="shd"><i class="ti ti-dashboard"></i> General</div>
+      ${comsAtras.length?`<div style="font-size:12px;color:var(--danger)">${comsAtras.length} equipo(s) con fecha límite vencida</div>`:''}</div>`:''}
+    ${areaActual!=='todos'?`<div style="padding:.4rem .7rem;background:${AREA_CFG[areaActual]?.bg};border:1px solid ${AREA_CFG[areaActual]?.col};border-radius:8px;margin-bottom:.65rem;font-size:12px;color:${AREA_CFG[areaActual]?.col};font-weight:500"><i class="ti ${AREA_CFG[areaActual]?.icon}"></i> Viendo: ${areaActual} (${eqBase.length} equipos)</div>`:''}
+    <div class="shd"><i class="ti ti-tractor"></i> Equipos${areaActual!=='todos'?' — '+areaActual:''}</div>
+    <div class="sg">
+      <div class="sc"><div class="sv" style="color:var(--acc)">${eqBase.length}</div><div class="sl">Total</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc2)">${eqEnProceso.length}</div><div class="sl">En Proceso</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${eqDisponible.length}</div><div class="sl">Disponibles</div></div>
+      <div class="sc"><div class="sv" style="color:var(--danger)">${comsAtras.length}</div><div class="sl">Atrasados</div></div>
+    </div>
+    <div class="sg">
+      <div class="sc"><div class="sv" style="color:var(--acc)">${comsSemana.length}</div><div class="sl">Esta semana</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc2)">${comsProxSemana.length}</div><div class="sl">Próx. semana</div></div>
+    </div>
+    ${areaActual==='todos'&&porArea.length?`<div class="shd"><i class="ti ti-layout-grid"></i> Por Área</div>
+    ${porArea.map(x=>`<div class="card" style="border-color:${AREA_CFG[x.a]?.col};margin-bottom:.4rem">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
+        <div style="display:flex;align-items:center;gap:.4rem"><i class="ti ${AREA_CFG[x.a]?.icon}" style="color:${AREA_CFG[x.a]?.col}"></i>
+          <span style="font-weight:500;font-size:13px;color:${AREA_CFG[x.a]?.col}">${x.a}</span></div>
+        <span style="font-family:var(--fm);font-size:11px;color:var(--text2)">${x.total} equipos</span>
+      </div>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--acc2)">${x.enProceso} en proceso</span>
+        <span style="font-size:11px;color:var(--acc3)">${x.disponible} disponibles</span>
+        ${x.atrasados?`<span style="font-size:11px;color:var(--danger)">${x.atrasados} atrasados</span>`:''}
+      </div></div>`).join('')}`:''}
+    <div class="shd"><i class="ti ti-building"></i> Por Sucursal</div>
+    ${eqPorSuc.filter(s=>s.total>0).map(s=>`<div class="card" style="margin-bottom:.5rem">
+      <div class="ct" style="margin-bottom:.4rem">${s.s}</div>
+      <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.35rem">
+        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc)">${s.total}</div><div class="sl">Total</div></div>
+        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc2)">${s.enProceso}</div><div class="sl">En Proceso</div></div>
+        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc3)">${s.disponible}</div><div class="sl">Disponibles</div></div>
+        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--danger)">${s.atrasados}</div><div class="sl">Atrasados</div></div>
+      </div>
+      <div style="display:flex;gap:.4rem">
+        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.35rem;text-align:center"><div style="font-size:13px;font-weight:600;color:var(--acc);font-family:var(--fm)">${s.semana}</div><div style="font-size:9px;color:var(--text2);text-transform:uppercase">Esta semana</div></div>
+        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.35rem;text-align:center"><div style="font-size:13px;font-weight:600;color:var(--acc2);font-family:var(--fm)">${s.proxSemana}</div><div style="font-size:9px;color:var(--text2);text-transform:uppercase">Próx. semana</div></div>
+      </div></div>`).join('')}
+    ${comsAtras.length?`<div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Atrasados por Mes (${comsAtras.length})</div>
+    ${Object.entries(atrasosPorMes).sort().map(([mes,lista])=>{
+      const [anio,m]=mes.split('-');
+      const nomMes=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m)]||mes;
+      return `<div class="card" style="border-color:rgba(239,68,68,.25);margin-bottom:.45rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
+          <span style="font-weight:500;color:var(--danger)">${nomMes} ${anio}</span>
+          <span class="badge b-pau">${lista.length} equipo${lista.length>1?'s':''}</span>
+        </div>
+        ${lista.map(c=>{
+          const eq=getEq(c.equipo_cod);
+          const d=Math.abs(Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)));
+          return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:.2rem 0;border-bottom:1px solid var(--border)">
+            <span>${eq.nombre} ${areaBadge(eq.area)}</span>
+            <span style="color:var(--danger)">${d}d · ${c.destino_envio}</span></div>`;
+        }).join('')}
+      </div>`;
+    }).join('')}`:''}
+    <div class="shd"><i class="ti ti-dashboard"></i> OTs de Trabajo</div>
     <div class="sg">
       <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">Total OTs</div></div>
       <div class="sc"><div class="sv" style="color:var(--acc3)">${cumpl}%</div><div class="sl">Cumplimiento</div></div>
@@ -1488,26 +1644,6 @@ function renderAdminKPIs(tc){
       <div class="ct" style="margin-bottom:.35rem">Horas ejecutadas vs programadas</div>
       <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:.2rem"><span>${hE}h ejecutadas</span><span>${hP}h programadas</span></div>
       ${pbw(efic)}
-    </div>
-    <div class="shd"><i class="ti ti-building"></i> Por Sucursal</div>
-    ${['Lo Pinto','La Negra'].map(suc=>{
-      const sOTs=ots.filter(o=>o.sucursal===suc);
-      const sFin=sOTs.filter(o=>o.estado==='finalizada').length;
-      const sPct=sOTs.length?Math.round(sFin/sOTs.length*100):0;
-      return `<div class="card" style="margin-bottom:.45rem">
-        <div class="chd" style="margin-bottom:.35rem">
-          <div><div class="ct">${suc}</div><div class="cs">${sOTs.length} OTs · ${sFin} finalizadas</div></div>
-          <span class="badge ${sPct>=80?'b-don':sPct>=50?'b-run':'b-pau'}">${sPct}%</span>
-        </div>${pbw(sPct)}</div>`;
-    }).join('')}
-    <div class="shd"><i class="ti ti-users"></i> Por Técnico</div>
-    <div class="card">
-      ${[...new Set(ots.map(o=>o.tecnico))].map(t=>{
-        const to=ots.filter(o=>o.tecnico===t);
-        const tf=to.filter(o=>o.estado==='finalizada').length;
-        const tp=Math.round(tf/to.length*100);
-        return `<div style="margin-bottom:.55rem"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:.2rem"><span>${t}</span><span style="font-family:var(--fm);color:var(--text2);font-size:11px">${tf}/${to.length}</span></div>${pbw(tp)}</div>`;
-      }).join('')||'<div style="font-size:12px;color:var(--text2)">Sin datos</div>'}
     </div>`;
 }
 
