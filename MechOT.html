@@ -260,6 +260,7 @@ const EC={
 const S={
   role:null,tab:0,userName:'',userEmail:'',
   userSitio:'todos',
+  eqFiltro:'',
   alerts:[],
   // local cache
   ots:[],equipos:[],tecnicos:[],compromisos:[],inspecciones:[],
@@ -1144,25 +1145,140 @@ function renderJefe(){
   [renderJefeDash,()=>document.getElementById('TC').innerHTML=otList(visibleOTs(),'openPlanDet'),renderEquipos,renderCompromisos,renderCumplimiento][S.tab](document.getElementById('TC'));
 }
 
+// ── Estado equipo helpers ──
+const EQ_ESTADO = {
+  'En Proceso':  {cls:'b-run', col:'var(--acc2)',  bg:'rgba(59,130,246,.12)'},
+  'Disponible':  {cls:'b-don', col:'var(--acc3)',  bg:'rgba(16,185,129,.12)'},
+  'Entregado':   {cls:'b-pen', col:'#fcd34d',      bg:'rgba(245,158,11,.12)'},
+};
+const eqEstadoBadge = est => {
+  const c=EQ_ESTADO[est]||EQ_ESTADO['En Proceso'];
+  return `<span style="font-size:9px;padding:1px 7px;border-radius:10px;background:${c.bg};color:${c.col};border:1px solid ${c.col};font-family:var(--fm)">${est||'En Proceso'}</span>`;
+};
+
+// ── Week helpers ──
+function getNextWeekRange(){
+  const {domStr}=getWeekRange();
+  const nextLun=new Date(domStr+'T12:00:00'); nextLun.setDate(nextLun.getDate()+1);
+  const nextDom=new Date(nextLun); nextDom.setDate(nextLun.getDate()+6);
+  return {nextLunStr:nextLun.toISOString().split('T')[0], nextDomStr:nextDom.toISOString().split('T')[0]};
+}
+
 function renderJefeDash(tc){
   const ots=visibleOTs();
   const tot=ots.length; const fin=ots.filter(o=>o.estado==='finalizada').length;
   const paus=ots.filter(o=>o.estado==='pausada').length;
   const cumpl=tot?Math.round(fin/tot*100):0;
   const hoy=today();
+  const {lunStr,domStr}=getWeekRange();
+  const {nextLunStr,nextDomStr}=getNextWeekRange();
   const atras=ots.filter(o=>o.estado!=='finalizada'&&o.fecha_programada<hoy);
   const comVenc=visibleCompromisos().filter(c=>c.estado!=='Entregado'&&c.fecha_limite<hoy);
+
+  // ── Equipos KPIs ──
+  const eqVis=visibleEquipos();
+  const eqEnProceso=eqVis.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso');
+  const eqDisponible=eqVis.filter(e=>e.estado_equipo==='Disponible');
+  const coms=visibleCompromisos().filter(c=>c.estado!=='Entregado');
+  const comsAtras=coms.filter(c=>c.fecha_limite<hoy);
+  const comsSemana=coms.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr);
+  const comsProxSemana=coms.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr);
+
+  // Atrasados por mes
+  const atrasosPorMes={};
+  comsAtras.forEach(c=>{
+    const mes=c.fecha_limite?c.fecha_limite.substring(0,7):'Sin fecha';
+    if(!atrasosPorMes[mes]) atrasosPorMes[mes]=[];
+    atrasosPorMes[mes].push(c);
+  });
+
+  // Por sucursal
+  const sucursales=['Lo Pinto','La Negra'];
+  const eqPorSuc=sucursales.map(s=>({
+    s,
+    total:eqVis.filter(e=>e.sucursal===s).length,
+    enProceso:eqVis.filter(e=>e.sucursal===s&&(e.estado_equipo||'En Proceso')==='En Proceso').length,
+    disponible:eqVis.filter(e=>e.sucursal===s&&e.estado_equipo==='Disponible').length,
+    atrasados:coms.filter(c=>c.sucursal===s&&c.fecha_limite<hoy).length,
+    semana:coms.filter(c=>c.sucursal===s&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length,
+    proxSemana:coms.filter(c=>c.sucursal===s&&c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr).length,
+  }));
+
   tc.innerHTML=`
+    <!-- KPIs EQUIPOS HABILITACIÓN -->
+    <div class="shd"><i class="ti ti-tractor"></i> Estado de Equipos en Habilitación</div>
+    <div class="sg">
+      <div class="sc"><div class="sv" style="color:var(--acc)">${eqVis.length}</div><div class="sl">Total Equipos</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc2)">${eqEnProceso.length}</div><div class="sl">En Proceso</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${eqDisponible.length}</div><div class="sl">Disponibles</div></div>
+      <div class="sc"><div class="sv" style="color:var(--danger)">${comsAtras.length}</div><div class="sl">Atrasados</div></div>
+    </div>
+
+    <!-- ENTREGAS -->
+    <div class="sg">
+      <div class="sc" style="cursor:pointer" onclick="setTab(4);renderRole()">
+        <div class="sv" style="color:var(--acc)">${comsSemana.length}</div>
+        <div class="sl">Entregan esta semana</div>
+      </div>
+      <div class="sc">
+        <div class="sv" style="color:var(--acc2)">${comsProxSemana.length}</div>
+        <div class="sl">Entregan próx. semana</div>
+      </div>
+    </div>
+
+    <!-- POR SUCURSAL -->
+    <div class="shd"><i class="ti ti-building"></i> Por Sucursal</div>
+    ${eqPorSuc.filter(s=>s.total>0).map(s=>`
+    <div class="card" style="margin-bottom:.5rem">
+      <div class="ct" style="margin-bottom:.5rem">${s.s}</div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.4rem">
+        <div class="sc" style="flex:1;min-width:60px;padding:.5rem"><div class="sv" style="font-size:16px;color:var(--acc)">${s.total}</div><div class="sl">Total</div></div>
+        <div class="sc" style="flex:1;min-width:60px;padding:.5rem"><div class="sv" style="font-size:16px;color:var(--acc2)">${s.enProceso}</div><div class="sl">En Proceso</div></div>
+        <div class="sc" style="flex:1;min-width:60px;padding:.5rem"><div class="sv" style="font-size:16px;color:var(--acc3)">${s.disponible}</div><div class="sl">Disponibles</div></div>
+        <div class="sc" style="flex:1;min-width:60px;padding:.5rem"><div class="sv" style="font-size:16px;color:var(--danger)">${s.atrasados}</div><div class="sl">Atrasados</div></div>
+      </div>
+      <div style="display:flex;gap:.4rem">
+        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.4rem;text-align:center">
+          <div style="font-size:14px;font-weight:600;color:var(--acc);font-family:var(--fm)">${s.semana}</div>
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase">Esta semana</div>
+        </div>
+        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.4rem;text-align:center">
+          <div style="font-size:14px;font-weight:600;color:var(--acc2);font-family:var(--fm)">${s.proxSemana}</div>
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase">Próx. semana</div>
+        </div>
+      </div>
+    </div>`).join('')}
+
+    <!-- ATRASADOS POR MES -->
+    ${comsAtras.length?`
+    <div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Atrasados por Mes (${comsAtras.length})</div>
+    ${Object.entries(atrasosPorMes).sort().map(([mes,lista])=>{
+      const [anio,m]=mes.split('-');
+      const nomMes=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m)]||mes;
+      return `<div class="card" style="border-color:rgba(239,68,68,.25);margin-bottom:.45rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+          <span style="font-weight:500;color:var(--danger)">${nomMes} ${anio}</span>
+          <span class="badge b-pau">${lista.length} equipo${lista.length>1?'s':''}</span>
+        </div>
+        ${lista.map(c=>{
+          const eq=getEq(c.equipo_cod);
+          const diffDias=Math.abs(Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)));
+          return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0;border-bottom:1px solid var(--border)">
+            <span>${eq.nombre} <span style="color:var(--text3)">[${eq.codigo_interno}]</span></span>
+            <span style="color:var(--danger)">${diffDias}d atraso · ${c.destino_envio}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('')}`:''}
+
+    <!-- OTs -->
+    <div class="shd"><i class="ti ti-clipboard-list"></i> OTs de Trabajo</div>
     <div class="sg">
       <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">Total OTs</div></div>
       <div class="sc"><div class="sv" style="color:var(--acc3)">${cumpl}%</div><div class="sl">Cumplimiento</div></div>
       <div class="sc"><div class="sv" style="color:var(--acc2)">${ots.filter(o=>['en_ejecucion','en_proceso'].includes(o.estado)).length}</div><div class="sl">En Curso</div></div>
       <div class="sc"><div class="sv" style="color:var(--warn)">${paus}</div><div class="sl">Pausadas</div></div>
     </div>
-    ${comVenc.length?`<div class="card" style="border-color:rgba(239,68,68,.3)">
-      <div class="ct" style="color:var(--danger);margin-bottom:.35rem"><i class="ti ti-alert-triangle"></i> ${comVenc.length} compromiso(s) vencido(s)</div>
-      ${comVenc.map(c=>`<div style="font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)">${getEq(c.equipo_cod).nombre} · ${fmtDate(c.fecha_limite)}</div>`).join('')}
-    </div>`:''}
     ${atras.length?`<div class="card" style="border-color:rgba(239,68,68,.2)">
       <div class="ct" style="color:var(--danger);margin-bottom:.35rem"><i class="ti ti-clock-off"></i> OTs Atrasadas (${atras.length})</div>
       ${atras.map(o=>`<div style="font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)">${o.id_ot} · ${o.nombre} · ${fmtDate(o.fecha_programada)}</div>`).join('')}
@@ -1180,23 +1296,62 @@ function renderJefeDash(tc){
 
 function renderEquipos(tc){
   const eqs=visibleEquipos();
-  tc.innerHTML=`<div class="shd"><i class="ti ti-tractor"></i> Equipos (${eqs.length})</div>
-  ${eqs.map(e=>{
-    const eots=S.ots.filter(o=>o.equipo_cod===e.codigo_interno);
-    const act=eots.filter(o=>o.estado!=='finalizada').length;
-    return `<div class="eqcard" onclick="openEqDetail('${e.codigo_interno}')">
-      <div class="eqinitials">${e.codigo_interno.substring(0,4)}</div>
+  const hoy=today();
+  const {lunStr,domStr}=getWeekRange();
+
+  // Filtros
+  tc.innerHTML=`
+    <div style="display:flex;gap:.35rem;margin-bottom:.65rem;flex-wrap:wrap">
+      <button class="btn bg bsm ${!S.eqFiltro||S.eqFiltro===''?'bp':''}" onclick="S.eqFiltro='';renderRole()">Todos (${eqs.length})</button>
+      <button class="btn bg bsm" style="${S.eqFiltro==='En Proceso'?'background:var(--acc2);color:#fff':''}" onclick="S.eqFiltro='En Proceso';renderRole()">En Proceso (${eqs.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso').length})</button>
+      <button class="btn bg bsm" style="${S.eqFiltro==='Disponible'?'background:var(--acc3);color:#fff':''}" onclick="S.eqFiltro='Disponible';renderRole()">Disponibles (${eqs.filter(e=>e.estado_equipo==='Disponible').length})</button>
+      <button class="btn bg bsm" style="${S.eqFiltro==='atrasado'?'background:var(--danger);color:#fff':''}" onclick="S.eqFiltro='atrasado';renderRole()">Atrasados</button>
+      <button class="btn bg bsm" style="${S.eqFiltro==='semana'?'background:var(--acc);color:#1a1d26':''}" onclick="S.eqFiltro='semana';renderRole()">Esta semana</button>
+    </div>
+    <div id="EQL">${buildEqList(eqs, hoy, lunStr, domStr)}</div>`;
+}
+
+function buildEqList(eqs, hoy, lunStr, domStr){
+  const coms=S.compromisos;
+  let filtered=eqs;
+  if(S.eqFiltro==='En Proceso') filtered=eqs.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso');
+  else if(S.eqFiltro==='Disponible') filtered=eqs.filter(e=>e.estado_equipo==='Disponible');
+  else if(S.eqFiltro==='atrasado') filtered=eqs.filter(e=>{
+    const c=coms.find(c=>c.equipo_cod===e.codigo_interno&&c.estado!=='Entregado');
+    return c&&c.fecha_limite<hoy;
+  });
+  else if(S.eqFiltro==='semana') filtered=eqs.filter(e=>{
+    const c=coms.find(c=>c.equipo_cod===e.codigo_interno&&c.estado!=='Entregado');
+    return c&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;
+  });
+
+  if(!filtered.length) return `<div class="es"><i class="ti ti-tractor"></i>Sin equipos en esta categoría</div>`;
+
+  return filtered.map(e=>{
+    const com=coms.find(c=>c.equipo_cod===e.codigo_interno&&c.estado!=='Entregado');
+    const est=e.estado_equipo||'En Proceso';
+    let fechaCol='var(--text2)', fechaTxt='', fechaBorder='var(--border)';
+    if(com){
+      const diff=Math.round((new Date(com.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000));
+      fechaTxt=diff<0?`⚠ ${Math.abs(diff)}d atraso`:diff===0?'Hoy':`${diff}d`;
+      fechaCol=diff<0?'var(--danger)':diff<=3?'var(--acc)':'var(--acc3)';
+      fechaBorder=diff<0?'rgba(239,68,68,.3)':diff<=7?'rgba(245,158,11,.25)':'var(--border)';
+    }
+    return `<div class="eqcard" style="border-color:${fechaBorder};align-items:flex-start" onclick="openEqDetail('${e.codigo_interno}')">
+      <div class="eqinitials" style="margin-top:.2rem">${e.codigo_interno.substring(0,4)}</div>
       <div style="flex:1;min-width:0">
         <div style="font-weight:500;font-size:13px">${e.nombre}</div>
-        <div style="font-size:11px;color:var(--text2)">${e.marca} ${e.modelo} · ${e.anio}</div>
-        <div style="display:flex;gap:.35rem;margin-top:.2rem;flex-wrap:wrap">
-          <span class="tag-tipo">${e.tipo}</span>
-          ${act?`<span class="badge b-run" style="font-size:9px">${act} activa${act>1?'s':''}</span>`:''}
+        <div style="font-size:11px;color:var(--text2)">${e.marca} ${e.modelo}</div>
+        <div style="display:flex;gap:.35rem;margin-top:.25rem;flex-wrap:wrap;align-items:center">
+          ${eqEstadoBadge(est)}
+          <span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(139,92,246,.1);color:#c4b5fd;border:1px solid rgba(139,92,246,.25);font-family:var(--fm)">${e.sucursal}</span>
+          ${com?`<span style="font-size:10px;color:${fechaCol};font-weight:500">${fmtDate(com.fecha_limite)} · ${fechaTxt}</span>`:''}
         </div>
+        ${com?`<div style="font-size:10px;color:var(--text3);margin-top:.15rem"><i class="ti ti-map-pin" style="font-size:10px"></i> ${com.destino_envio}</div>`:''}
       </div>
-      <i class="ti ti-chevron-right" style="color:var(--text3)"></i>
+      <i class="ti ti-chevron-right" style="color:var(--text3);margin-top:.2rem"></i>
     </div>`;
-  }).join('')||`<div class="es"><i class="ti ti-tractor"></i>Sin equipos</div>`}`;
+  }).join('');
 }
 
 function openEqDetail(cod){
@@ -1210,13 +1365,35 @@ function openEqDetail(cod){
   const tareasDone=eots.reduce((a,o)=>{const t=JSON.parse(o.tareas_json||'[]');return a+t.filter(x=>x.check).length;},0);
   const pct=tareasTot?Math.round(tareasDone/tareasTot*100):0;
   const com=visibleCompromisos().find(c=>c.equipo_cod===cod&&c.estado!=='Entregado');
+  const hoy=today();
+  const est=e.estado_equipo||'En Proceso';
+
   document.getElementById('m-det-t').textContent=e.codigo_interno;
   document.getElementById('m-det-b').innerHTML=`
     <div style="margin-bottom:.75rem">
       <div style="font-weight:600;font-size:15px">${e.nombre}</div>
-      <div style="font-size:12px;color:var(--text2)">${e.marca} ${e.modelo} · ${e.anio}</div>
-      <div style="margin-top:.25rem"><span class="tag-tipo">${e.tipo}</span></div>
+      <div style="font-size:12px;color:var(--text2)">${e.marca} ${e.modelo}</div>
+      <div style="display:flex;gap:.35rem;margin-top:.35rem;flex-wrap:wrap;align-items:center">
+        ${eqEstadoBadge(est)}
+        <span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(139,92,246,.1);color:#c4b5fd;border:1px solid rgba(139,92,246,.25);font-family:var(--fm)">${e.sucursal}</span>
+        <span style="font-size:11px;color:var(--text3)">${e.tipo}</span>
+      </div>
     </div>
+
+    <!-- ESTADO EQUIPO — solo Admin puede cambiar -->
+    ${S.role==='admin'?`<div class="card" style="margin-bottom:.65rem">
+      <div class="ct" style="margin-bottom:.5rem"><i class="ti ti-settings" style="color:var(--acc4)"></i> Estado del Equipo</div>
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap">
+        ${['En Proceso','Disponible','Entregado'].map(s=>`
+          <button class="btn bsm ${est===s?'bs':''}" style="${est===s?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
+            onclick="cambiarEstadoEquipo('${cod}','${s}')">
+            ${s==='En Proceso'?'<i class="ti ti-tool"></i>':s==='Disponible'?'<i class="ti ti-circle-check"></i>':'<i class="ti ti-truck"></i>'}
+            ${s}
+          </button>`).join('')}
+      </div>
+      ${est==='Disponible'?`<div style="margin-top:.5rem;font-size:11px;color:var(--acc3);background:rgba(16,185,129,.08);border-radius:6px;padding:.4rem .6rem"><i class="ti ti-info-circle"></i> Equipo listo para entrega — pendiente despacho</div>`:''}
+    </div>`:''}
+
     <div class="sg">
       <div class="sc"><div class="sv" style="color:var(--acc)">${eots.length}</div><div class="sl">OTs Total</div></div>
       <div class="sc"><div class="sv" style="color:var(--acc3)">${pct}%</div><div class="sl">Avance</div></div>
@@ -1224,15 +1401,34 @@ function openEqDetail(cod){
       <div class="sc"><div class="sv" style="color:var(--text2)">${hP}h</div><div class="sl">Hrs Prog.</div></div>
     </div>
     <div class="card">${pbw(pct)}<div style="font-size:11px;color:var(--text2);margin-top:.25rem">Tareas: ${tareasDone}/${tareasTot}</div></div>
-    ${com?`<div class="card" style="border-color:rgba(245,158,11,.35)">
-      <div class="ct" style="margin-bottom:.25rem"><i class="ti ti-flag" style="color:var(--acc)"></i> Compromiso pendiente</div>
+
+    ${com?`<div class="card" style="border-color:${com.fecha_limite<hoy?'rgba(239,68,68,.4)':com.fecha_limite<=new Date(new Date(hoy).setDate(new Date(hoy).getDate()+7)).toISOString().split('T')[0]?'rgba(245,158,11,.4)':'rgba(59,130,246,.25)'}">
+      <div class="ct" style="margin-bottom:.25rem"><i class="ti ti-flag" style="color:var(--acc)"></i> Compromiso de entrega</div>
       <div style="font-size:12px">${com.objetivo}</div>
-      <div style="font-size:11px;color:var(--text2)"><i class="ti ti-calendar"></i> ${fmtDate(com.fecha_limite)} · ${com.destino_envio}</div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-top:.25rem">
+        <span><i class="ti ti-map-pin"></i> ${com.destino_envio}</span>
+        <span style="color:${com.fecha_limite<hoy?'var(--danger)':'var(--text2)'}">
+          ${fmtDate(com.fecha_limite)} ${com.fecha_limite<hoy?`· ⚠ ${Math.abs(Math.round((new Date(com.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)))}d atraso`:''}
+        </span>
+      </div>
     </div>`:''}
-    ${activas.length?`<div class="shd"><i class="ti ti-tool"></i> OTs Activas (${activas.length})</div>${activas.map(o=>otCard(o,'openPlanDet')).join('')}`:''}
+
+    ${activas.length?`<div class="shd"><i class="ti ti-tool"></i> OTs Activas (${activas.length})</div>${activas.map(o=>otCard(o,S.role==='supervisor'?'openSupOT':'openPlanDet')).join('')}`:''}
     ${fin.length?`<div class="shd"><i class="ti ti-circle-check" style="color:var(--acc3)"></i> Finalizadas (${fin.length})</div>${fin.map(o=>otCard(o,'openPlanDet')).join('')}`:''}
     ${!eots.length?`<div class="es" style="padding:1rem"><i class="ti ti-clipboard-off"></i>Sin OTs</div>`:''}`;
   document.getElementById('m-det').classList.remove('hidden');
+}
+
+async function cambiarEstadoEquipo(cod, nuevoEstado){
+  try{
+    await supa.patch('equipos',`codigo_interno=eq.${cod}`,{estado_equipo:nuevoEstado});
+    const eq=S.equipos.find(e=>e.codigo_interno===cod);
+    if(eq) eq.estado_equipo=nuevoEstado;
+    openEqDetail(cod);
+    // Refrescar lista si está visible
+    const tc=document.getElementById('TC');
+    if(tc) renderRole();
+  }catch(e){alert('Error: '+e.message);}
 }
 
 function renderCompromisos(tc){
