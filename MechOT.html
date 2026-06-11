@@ -1,0 +1,1419 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="MechOT">
+<meta name="theme-color" content="#0d1117">
+<title>MechOT</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.44.0/tabler-icons.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ff:'IBM Plex Sans',sans-serif;--fm:'IBM Plex Mono',monospace;
+  --bg:#0d1117;--bg2:#161b27;--bg3:#1e2438;--bg4:#252c40;
+  --border:#2a3048;--border2:#3a4260;
+  --acc:#f59e0b;--acc2:#3b82f6;--acc3:#10b981;--acc4:#8b5cf6;
+  --danger:#ef4444;--warn:#f97316;
+  --text:#e2e8f0;--text2:#8892a4;--text3:#4a5270;
+}
+body{font-family:var(--ff);background:var(--bg);color:var(--text);font-size:14px;min-height:100vh;overflow-x:hidden}
+.hidden{display:none!important}
+input,select,textarea,button{font-family:var(--ff)}
+/* LOGIN */
+#login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;background:var(--bg)}
+.logo-wrap{display:flex;align-items:center;gap:.75rem;margin-bottom:.4rem}
+.logo-icon{width:44px;height:44px;background:var(--acc2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff}
+.logo-text{font-family:var(--fm);font-size:20px;font-weight:500;letter-spacing:2px}
+.app-sub{font-size:12px;color:var(--text2);margin-bottom:2rem}
+/* SHELL */
+#app{display:flex;flex-direction:column;min-height:100vh}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:.65rem 1rem;padding-top:calc(.65rem + env(safe-area-inset-top));display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.tbl{display:flex;align-items:center;gap:.6rem}
+.tb-logo{font-family:var(--fm);font-size:11px;color:var(--acc2);letter-spacing:2px}
+.tb-sep{width:1px;height:14px;background:var(--border2)}
+.tbrole{font-size:10px;padding:2px 7px;border-radius:4px;font-family:var(--fm)}
+.tbrole.p{background:rgba(59,130,246,.15);color:#93c5fd}
+.tbrole.s{background:rgba(16,185,129,.15);color:#6ee7b7}
+.tbrole.j{background:rgba(245,158,11,.15);color:#fcd34d}
+.tbrole.a{background:rgba(139,92,246,.15);color:#c4b5fd}
+.tbn{font-size:12px;color:var(--text2)}
+.tbr{display:flex;gap:.4rem;align-items:center}
+.ab{position:relative;background:none;border:1px solid var(--border);border-radius:7px;padding:4px 7px;cursor:pointer;color:var(--text2);font-size:15px;transition:.15s}
+.ab:hover{border-color:var(--warn);color:var(--warn)}
+.adot{position:absolute;top:-3px;right:-3px;width:8px;height:8px;background:var(--danger);border-radius:50%;border:2px solid var(--bg2)}
+.bl{font-size:11px;color:var(--text3);background:none;border:1px solid var(--border);border-radius:6px;padding:3px 7px;cursor:pointer}
+.bl:hover{border-color:var(--danger);color:var(--danger)}
+.main{flex:1;padding:1rem;padding-bottom:calc(1rem + env(safe-area-inset-bottom));overflow-y:auto;max-width:600px;margin:0 auto;width:100%}
+/* TABS */
+.nt{display:flex;gap:3px;margin-bottom:1rem;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:3px;overflow-x:auto}
+.ntb{flex:1;min-width:fit-content;padding:.4rem .45rem;text-align:center;border-radius:7px;cursor:pointer;font-size:11px;color:var(--text2);border:none;background:none;font-family:var(--ff);white-space:nowrap;transition:.15s}
+.ntb.on{background:var(--bg3);color:var(--text);border:1px solid var(--border2)}
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:.85rem;margin-bottom:.6rem}
+.chd{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:.6rem;gap:.5rem}
+.ct{font-weight:500;font-size:13px;line-height:1.4}
+.cs{font-size:11px;color:var(--text2);margin-top:2px}
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;font-size:10px;padding:2px 7px;border-radius:20px;font-family:var(--fm);white-space:nowrap}
+.b-new{background:rgba(139,92,246,.12);color:#c4b5fd;border:1px solid rgba(139,92,246,.25)}
+.b-run{background:rgba(59,130,246,.12);color:#93c5fd;border:1px solid rgba(59,130,246,.25)}
+.b-pau{background:rgba(249,115,22,.12);color:#fdba74;border:1px solid rgba(249,115,22,.25)}
+.b-don{background:rgba(16,185,129,.12);color:#6ee7b7;border:1px solid rgba(16,185,129,.25)}
+.b-pen{background:rgba(245,158,11,.12);color:#fcd34d;border:1px solid rgba(245,158,11,.25)}
+/* FORMS */
+.fg{margin-bottom:.75rem}
+.fl{font-size:10px;color:var(--text2);margin-bottom:.3rem;display:block;letter-spacing:.4px;text-transform:uppercase}
+.fi,.fs,.fta{width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:.5rem .7rem;color:var(--text);font-size:16px;outline:none;transition:border-color .2s}
+.fi:focus,.fs:focus,.fta:focus{border-color:var(--acc2)}
+.fs option{background:var(--bg2)}
+.fta{resize:vertical;min-height:65px;font-size:14px}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+/* BUTTONS */
+.btn{padding:.6rem 1rem;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:none;display:inline-flex;align-items:center;gap:.35rem;transition:.15s;min-height:44px}
+.bp{background:var(--acc2);color:#fff}.bp:hover{background:#2563eb}
+.bs{background:var(--acc3);color:#fff}.bs:hover{background:#059669}
+.bw{background:var(--acc);color:#1a1d26}.bw:hover{background:#d97706}
+.bg{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}.bg:hover{color:var(--text)}
+.bd{background:rgba(239,68,68,.1);color:#fca5a5;border:1px solid rgba(239,68,68,.2)}
+.bv{background:rgba(139,92,246,.1);color:#c4b5fd;border:1px solid rgba(139,92,246,.2)}
+.bfull{width:100%;justify-content:center}
+.bsm{padding:.3rem .6rem;font-size:11px;min-height:32px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+/* PROGRESS */
+.pbw{background:var(--bg4);border-radius:20px;height:6px;margin:.35rem 0}
+.pb{height:6px;border-radius:20px;transition:width .4s}
+.pb-b{background:var(--acc2)}.pb-g{background:var(--acc3)}.pb-a{background:var(--acc)}.pb-r{background:var(--danger)}
+/* TASK */
+.tki{display:flex;align-items:center;gap:.6rem;padding:.4rem 0;border-bottom:1px solid var(--border)}
+.tki:last-child{border-bottom:none}
+.tkc{width:17px;height:17px;border-radius:4px;border:1.5px solid var(--border2);cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.tkc.on{background:var(--acc3);border-color:var(--acc3)}
+/* STATS */
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:.55rem;margin-bottom:.65rem}
+.sc{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.65rem}
+.sv{font-size:20px;font-weight:600;font-family:var(--fm);margin-bottom:2px}
+.sl{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px}
+/* PHOTO */
+.pu{border:1.5px dashed var(--border2);border-radius:10px;padding:1rem;text-align:center;cursor:pointer;transition:.2s}
+.pu:hover{border-color:var(--acc2)}
+.pu.ok{border-style:solid;border-color:var(--acc3);background:rgba(16,185,129,.04)}
+.pu i{font-size:22px;color:var(--text3);display:block;margin-bottom:.3rem}
+.pu.ok i{color:var(--acc3)}
+.pu-txt{font-size:11px;color:var(--text2)}
+/* EVAL */
+.ei{background:var(--bg3);border:1px solid var(--border);border-radius:8px;padding:.65rem;margin-bottom:.4rem}
+.er{display:flex;align-items:center;gap:.45rem}
+.en{font-size:12px;flex:1;line-height:1.3}
+.eo{display:flex;gap:.25rem}
+.eb{width:26px;height:26px;border-radius:5px;border:1px solid var(--border);background:none;color:var(--text2);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center}
+.eb.ok-on{background:rgba(16,185,129,.18);border-color:var(--acc3);color:var(--acc3)}
+.eb.nc-on{background:rgba(239,68,68,.18);border-color:var(--danger);color:var(--danger)}
+.eb.na-on{background:rgba(100,116,139,.15);border-color:#64748b;color:#94a3b8}
+.ncph{margin-top:.4rem;font-size:11px;color:var(--danger);background:rgba(239,68,68,.07);border:1px dashed rgba(239,68,68,.3);border-radius:6px;padding:.3rem .55rem;cursor:pointer;text-align:center}
+.ncph.up{border-style:solid;color:#6ee7b7;border-color:rgba(16,185,129,.4);background:rgba(16,185,129,.05)}
+/* MODAL */
+.mo{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;display:flex;align-items:flex-end;justify-content:center}
+.md{background:var(--bg2);border:1px solid var(--border);border-radius:16px 16px 0 0;padding:1rem;padding-bottom:calc(1rem + env(safe-area-inset-bottom));width:100%;max-height:92vh;overflow-y:auto}
+.mdt{font-weight:600;font-size:14px;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between}
+.mc{background:none;border:none;color:var(--text2);font-size:22px;cursor:pointer;line-height:1;padding:0 3px}
+/* MISC */
+.div{height:1px;background:var(--border);margin:.75rem 0}
+.hp{font-family:var(--fm);font-size:11px;color:var(--acc);background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.2);border-radius:5px;padding:1px 6px}
+.es{text-align:center;padding:2.5rem 1rem;color:var(--text3)}
+.es i{font-size:30px;display:block;margin-bottom:.5rem}
+.shd{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.7px;margin:.65rem 0 .4rem;display:flex;align-items:center;gap:.35rem}
+.tli{display:flex;gap:.6rem;padding:.35rem 0}
+.tld{width:8px;height:8px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.tag-tipo{font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(59,130,246,.1);color:#93c5fd;border:1px solid rgba(59,130,246,.2);font-family:var(--fm)}
+.sf-btn{padding:.3rem .65rem;border-radius:6px;font-size:11px;cursor:pointer;border:1px solid var(--border);background:var(--bg3);color:var(--text2);font-family:var(--fm)}
+.eqcard{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.75rem;margin-bottom:.5rem;display:flex;align-items:center;gap:.75rem;cursor:pointer}
+.eqinitials{width:36px;height:36px;border-radius:8px;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--fm);font-size:11px;color:var(--acc);flex-shrink:0}
+.comcard{background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:.75rem;margin-bottom:.5rem}
+/* LOADING */
+.loading{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem;color:var(--text2)}
+.spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--acc2);border-radius:50%;animation:spin .8s linear infinite;margin-bottom:.75rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+input[type=file]{display:none}
+input[type=range]{width:100%;accent-color:var(--acc);height:20px;cursor:pointer}
+.cwrap{background:var(--bg3);border-radius:8px;padding:.65rem}
+.cbars{display:flex;align-items:flex-end;gap:5px;height:100px;padding:0 2px}
+.bar{border-radius:2px 2px 0 0;min-height:2px;transition:height .4s}
+.blbl{font-size:8px;color:var(--text3);text-align:center;margin-top:.2rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cleg{display:flex;gap:.65rem;margin-top:.4rem;flex-wrap:wrap}
+.lgi{display:flex;align-items:center;gap:.3rem;font-size:10px;color:var(--text2)}
+.lgd{width:8px;height:8px;border-radius:2px}
+</style>
+</head>
+<body>
+
+<!-- SUPABASE CONFIG -->
+<script>
+const SUPA_URL = 'https://vqvwdduvpgneunbhllak.supabase.co';
+const SUPA_KEY = 'sb_publishable_9PTgSKSxrR8xi03X69WJfw_eGeD7B_C';
+
+// Supabase REST API helpers
+const supa = {
+  headers: {'Content-Type':'application/json','apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY},
+  async get(table, params=''){
+    const r=await fetch(`${SUPA_URL}/rest/v1/${table}?${params}`,{headers:this.headers});
+    if(!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async post(table, data){
+    const r=await fetch(`${SUPA_URL}/rest/v1/${table}`,{method:'POST',headers:{...this.headers,'Prefer':'return=representation'},body:JSON.stringify(data)});
+    if(!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async patch(table, filter, data){
+    const r=await fetch(`${SUPA_URL}/rest/v1/${table}?${filter}`,{method:'PATCH',headers:{...this.headers,'Prefer':'return=representation'},body:JSON.stringify(data)});
+    if(!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  async delete(table, filter){
+    const r=await fetch(`${SUPA_URL}/rest/v1/${table}?${filter}`,{method:'DELETE',headers:this.headers});
+    if(!r.ok) throw new Error(await r.text());
+    return true;
+  },
+  async upload(path, file){
+    const r=await fetch(`${SUPA_URL}/storage/v1/object/mechot-fotos/${path}`,{
+      method:'POST',
+      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':file.type,'x-upsert':'true'},
+      body:file
+    });
+    if(!r.ok) throw new Error(await r.text());
+    return `${SUPA_URL}/storage/v1/object/public/mechot-fotos/${path}`;
+  }
+};
+</script>
+
+<!-- LOGIN -->
+<div id="login">
+  <div class="logo-wrap">
+    <div class="logo-icon"><i class="ti ti-tool"></i></div>
+    <div class="logo-text">MechOT</div>
+  </div>
+  <div class="app-sub">Sistema de Gestión de Taller Mecánico</div>
+  <div style="width:100%;max-width:340px">
+    <div style="font-size:11px;color:var(--text2);text-align:center;margin-bottom:.75rem;letter-spacing:.5px">INGRESA TU EMAIL</div>
+    <div style="position:relative;margin-bottom:.65rem">
+      <i class="ti ti-mail" style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:var(--text3);font-size:16px"></i>
+      <input class="fi" id="login-email" type="email" placeholder="tucorreo@empresa.cl" style="padding-left:2.4rem" onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <button class="btn bp bfull" onclick="doLogin()" id="login-btn"><i class="ti ti-arrow-right"></i> Ingresar</button>
+    <div id="login-error" class="hidden" style="margin-top:.65rem;padding:.6rem .75rem;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);border-radius:8px;font-size:12px;color:#fca5a5;text-align:center"></div>
+    <div style="margin-top:1rem;padding:.65rem;background:var(--bg3);border:1px solid var(--border);border-radius:8px">
+      <div style="font-size:10px;color:var(--text3);margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.5px">Usuarios de prueba</div>
+      <div style="font-size:11px;color:var(--text2);line-height:1.8">
+        admin@excon.cl · jefe.lopinto@excon.cl<br>
+        plan.lopinto@excon.cl · sup1.lopinto@excon.cl<br>
+        jefe.lanegra@excon.cl · sup1.lanegra@excon.cl
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <div class="topbar">
+    <div class="tbl">
+      <span class="tb-logo">MechOT</span>
+      <div class="tb-sep"></div>
+      <span id="tbrole" class="tbrole">ROL</span>
+      <span id="tbn" class="tbn"></span>
+    </div>
+    <div class="tbr">
+      <span id="tb-sitio" style="font-size:10px;padding:2px 7px;border-radius:4px;font-family:var(--fm);display:none"></span>
+      <button class="ab" onclick="openAlerts()" id="ab"><i class="ti ti-bell"></i><span class="adot hidden" id="adot"></span></button>
+      <button class="bl" onclick="logout()"><i class="ti ti-logout"></i></button>
+    </div>
+  </div>
+  <div class="main" id="MC"></div>
+</div>
+
+<!-- MODALS -->
+<div id="m-ot" class="mo hidden"><div class="md"><div class="mdt"><span id="m-ot-t">OT</span><button class="mc" onclick="cm('m-ot')">×</button></div><div id="m-ot-b"></div></div></div>
+<div id="m-det" class="mo hidden"><div class="md"><div class="mdt"><span id="m-det-t">Detalle</span><button class="mc" onclick="cm('m-det')">×</button></div><div id="m-det-b"></div></div></div>
+<div id="m-eval" class="mo hidden"><div class="md"><div class="mdt"><span id="m-eval-t">Inspección</span><button class="mc" onclick="cm('m-eval')">×</button></div><div id="m-eval-b"></div></div></div>
+<div id="m-alerts" class="mo hidden"><div class="md"><div class="mdt"><span><i class="ti ti-bell" style="color:var(--warn)"></i> Alertas</span><button class="mc" onclick="cm('m-alerts')">×</button></div><div id="m-alerts-b"></div></div></div>
+<div id="m-eq" class="mo hidden"><div class="md"><div class="mdt"><span id="m-eq-t">Equipo</span><button class="mc" onclick="cm('m-eq')">×</button></div><div id="m-eq-b"></div></div></div>
+<div id="m-com" class="mo hidden"><div class="md"><div class="mdt"><span id="m-com-t">Compromiso</span><button class="mc" onclick="cm('m-com')">×</button></div><div id="m-com-b"></div></div></div>
+<div id="m-st" class="mo hidden"><div class="md"><div class="mdt"><span id="m-st-t">Estado</span><button class="mc" onclick="cm('m-st')">×</button></div><div id="m-st-b"></div></div></div>
+<div id="m-usr" class="mo hidden"><div class="md"><div class="mdt"><span id="m-usr-t">Usuario</span><button class="mc" onclick="cm('m-usr')">×</button></div><div id="m-usr-b"></div></div></div>
+
+<script>
+// ===================== STATE =====================
+const SITIOS=['lo_pinto','la_negra'];
+const SITIO_LBL={lo_pinto:'Lo Pinto',la_negra:'La Negra',todos:'Todos','Lo Pinto':'Lo Pinto','La Negra':'La Negra'};
+const EC={
+  sin_iniciar:{lbl:'Sin Iniciar',cls:'b-new',dot:'#c4b5fd'},
+  en_ejecucion:{lbl:'En Ejecución',cls:'b-run',dot:'var(--acc2)'},
+  en_proceso:{lbl:'En Proceso',cls:'b-run',dot:'var(--acc2)'},
+  pausada:{lbl:'Pausada',cls:'b-pau',dot:'var(--warn)'},
+  finalizada:{lbl:'Finalizada',cls:'b-don',dot:'var(--acc3)'}
+};
+
+const S={
+  role:null,tab:0,userName:'',userEmail:'',
+  userSitio:'todos',
+  alerts:[],
+  // local cache
+  ots:[],equipos:[],tecnicos:[],compromisos:[],inspecciones:[],
+  usuarios:[],plantillas:[],
+  evalState:null,
+  nextOTNum:1
+};
+
+const eb=o=>{const c=EC[o.estado]||EC.sin_iniciar;return `<span class="badge ${c.cls}">${c.lbl}</span>`;};
+const pbw=p=>{const c=p===100?'pb-g':p>50?'pb-b':p>0?'pb-a':'pb-r';return `<div class="pbw"><div class="pb ${c}" style="width:${p}%"></div></div>`;};
+const today=()=>new Date().toISOString().split('T')[0];
+const fmtDate=d=>d?new Date(d+'T12:00:00').toLocaleDateString('es-CL'):'';
+const fmtDT=d=>d?new Date(d).toLocaleString('es-CL',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+const getEq=cod=>S.equipos.find(e=>e.codigo_interno===cod)||{codigo_interno:cod,nombre:cod,tipo:'—',marca:'—',modelo:'—',anio:'—',sucursal:'—'};
+const sitioBadge=s=>`<span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(139,92,246,.1);color:#c4b5fd;border:1px solid rgba(139,92,246,.25);font-family:var(--fm)">${SITIO_LBL[s]||s}</span>`;
+function cm(id){document.getElementById(id).classList.add('hidden');}
+function visibleEquipos(){
+  if(S.userSitio==='todos') return S.equipos;
+  return S.equipos.filter(e=>e.sucursal===S.userSitio);
+}
+function visibleOTs(){
+  const cods=new Set(visibleEquipos().map(e=>e.codigo_interno));
+  return S.ots.filter(o=>cods.has(o.equipo_cod));
+}
+function visibleCompromisos(){
+  const cods=new Set(visibleEquipos().map(e=>e.codigo_interno));
+  return S.compromisos.filter(c=>cods.has(c.equipo_cod));
+}
+function showLoading(container){
+  document.getElementById(container).innerHTML=`<div class="loading"><div class="spinner"></div><div>Cargando...</div></div>`;
+}
+
+// ===================== AUTH =====================
+async function doLogin(){
+  const email=(document.getElementById('login-email').value||'').trim().toLowerCase();
+  if(!email){showErr('Ingresa tu email');return;}
+  const btn=document.getElementById('login-btn');
+  btn.disabled=true; btn.innerHTML='<div class="spinner" style="width:18px;height:18px;border-width:2px;margin:0"></div>';
+  try{
+    const users=await supa.get('usuarios',`email=eq.${encodeURIComponent(email)}&activo=eq.true&select=*`);
+    if(!users.length){showErr('Email no encontrado. Contacta al administrador.');btn.disabled=false;btn.innerHTML='<i class="ti ti-arrow-right"></i> Ingresar';return;}
+    const u=users[0];
+    S.role=u.rol; S.userName=u.nombre; S.userEmail=u.email;
+    S.userSitio=u.sucursal==='todos'?'todos':u.sucursal;
+    document.getElementById('login-error').classList.add('hidden');
+    await loadAllData();
+    showApp();
+  }catch(e){showErr('Error de conexión: '+e.message);btn.disabled=false;btn.innerHTML='<i class="ti ti-arrow-right"></i> Ingresar';}
+}
+function showErr(msg){
+  const el=document.getElementById('login-error');
+  el.textContent=msg; el.classList.remove('hidden');
+}
+async function loadAllData(){
+  const sucFilter=S.userSitio==='todos'?'':'&sucursal=eq.'+encodeURIComponent(S.userSitio);
+  const [ots,equipos,tecs,coms,insps,users,plants]=await Promise.all([
+    supa.get('ots',`select=*&order=created_at.desc${sucFilter}`),
+    supa.get('equipos','select=*&order=codigo_interno'),
+    supa.get('tecnicos','select=*&order=nombre'),
+    supa.get('compromisos',`select=*&order=fecha_limite${sucFilter}`),
+    supa.get('inspecciones',`select=*&order=fecha_inspeccion.desc${sucFilter}`),
+    supa.get('usuarios','select=*&order=nombre'),
+    supa.get('plantillas_inspeccion','select=*&order=tipo_inspeccion,tipo_equipo,orden')
+  ]);
+  S.ots=ots; S.equipos=equipos; S.tecnicos=tecs;
+  S.compromisos=coms; S.inspecciones=insps;
+  S.usuarios=users; S.plantillas=plants;
+  // next OT number
+  const nums=S.ots.map(o=>parseInt(o.id_ot.replace(/\D/g,''))||0);
+  S.nextOTNum=nums.length?Math.max(...nums)+1:1;
+}
+function showApp(){
+  document.getElementById('login').classList.add('hidden');
+  document.getElementById('app').classList.remove('hidden');
+  const t=document.getElementById('tbrole');
+  t.className='tbrole '+S.role.charAt(0);
+  t.textContent={planificador:'PLAN',supervisor:'SUP',jefe:'JEFE',admin:'ADM'}[S.role];
+  document.getElementById('tbn').textContent=S.userName;
+  const sb=document.getElementById('tb-sitio');
+  if(S.userSitio!=='todos'){
+    sb.textContent=SITIO_LBL[S.userSitio]||S.userSitio;
+    sb.style.display='';
+    sb.style.cssText='display:inline-block;font-size:10px;padding:2px 7px;border-radius:4px;font-family:var(--fm);background:rgba(139,92,246,.12);color:#c4b5fd;border:1px solid rgba(139,92,246,.3)';
+  }else{sb.style.display='none';}
+  S.tab=0; renderRole();
+}
+function logout(){
+  S.role=null; S.userName=''; S.userEmail=''; S.userSitio='todos';
+  S.ots=[]; S.equipos=[]; S.tecnicos=[]; S.compromisos=[]; S.inspecciones=[];
+  document.getElementById('app').classList.add('hidden');
+  document.getElementById('login').classList.remove('hidden');
+  document.getElementById('login-email').value='';
+  document.getElementById('login-error').classList.add('hidden');
+  document.getElementById('login-btn').disabled=false;
+  document.getElementById('login-btn').innerHTML='<i class="ti ti-arrow-right"></i> Ingresar';
+}
+function setTab(i){S.tab=i;renderRole();}
+function renderRole(){
+  const r={planificador:renderPlan,supervisor:renderSup,jefe:renderJefe,admin:renderAdmin}[S.role];
+  if(r) r();
+}
+
+// ===================== ALERTS =====================
+function addAlert(type,title,desc){S.alerts.unshift({id:Date.now(),type,title,desc,ts:new Date().toLocaleTimeString('es-CL',{hour:'2-digit',minute:'2-digit'})});updateAdot();}
+function updateAdot(){const d=document.getElementById('adot');if(d)d.classList.toggle('hidden',S.alerts.length===0);}
+function openAlerts(){
+  const b=document.getElementById('m-alerts-b');
+  b.innerHTML=!S.alerts.length?`<div class="es"><i class="ti ti-bell-off"></i>Sin alertas</div>`:
+    S.alerts.map(a=>`<div style="padding:.6rem;background:${a.type==='crit'?'rgba(239,68,68,.05)':'rgba(249,115,22,.05)'};border:1px solid ${a.type==='crit'?'rgba(239,68,68,.2)':'rgba(249,115,22,.2)'};border-radius:8px;margin-bottom:.4rem">
+      <div style="font-size:12px;font-weight:500">${a.title}</div>
+      <div style="font-size:11px;color:var(--text2)">${a.desc} · ${a.ts}</div>
+    </div>`).join('')+`<div class="div"></div><button class="btn bg bsm" onclick="S.alerts=[];updateAdot();cm('m-alerts')">Limpiar</button>`;
+  document.getElementById('m-alerts').classList.remove('hidden');
+}
+
+// ===================== OT HELPERS =====================
+function otMeta(o){
+  const eq=getEq(o.equipo_cod);
+  return `<div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--text2)">
+    <span><i class="ti ti-tractor" style="font-size:11px"></i> ${eq.codigo_interno}</span>
+    <span><i class="ti ti-user" style="font-size:11px"></i> ${o.tecnico}</span>
+    <span class="hp"><i class="ti ti-clock" style="font-size:10px"></i> ${o.horas_ejecutadas||0}/${o.horas_programadas}h</span>
+    ${sitioBadge(o.sucursal)}
+    <span style="margin-left:auto;font-size:10px;color:var(--text3)">${fmtDate(o.fecha_programada)}</span>
+  </div>`;
+}
+function otCard(o,fn){
+  return `<div class="card" style="cursor:pointer" onclick="${fn}('${o.id_ot}')">
+    <div class="chd">
+      <div style="flex:1;min-width:0">
+        <div style="font-family:var(--fm);font-size:10px;color:var(--text3)">${o.id_ot}</div>
+        <div class="ct">${o.nombre}</div>
+        <div class="cs">${getEq(o.equipo_cod).nombre}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:.25rem">${eb(o)}<span style="font-size:11px;color:var(--text2)">${o.avance_pct||0}%</span></div>
+    </div>
+    ${otMeta(o)}
+    ${pbw(o.avance_pct||0)}
+  </div>`;
+}
+function otList(list,fn){return list.length?list.map(o=>otCard(o,fn)).join(''):`<div class="es"><i class="ti ti-inbox"></i>Sin resultados</div>`;}
+
+// ===================== PLANIFICADOR =====================
+function renderPlan(){
+  const tabs=['OTs','Resumen','Cumplimiento'];
+  document.getElementById('MC').innerHTML=`
+    <div class="nt">${tabs.map((t,i)=>`<button class="ntb ${S.tab===i?'on':''}" onclick="setTab(${i})">${t}</button>`).join('')}</div>
+    <div id="TC"></div>`;
+  [renderPlanOTs,renderResumen,renderCumplimiento][S.tab](document.getElementById('TC'));
+}
+function renderPlanOTs(tc){
+  const vis=visibleOTs();
+  tc.innerHTML=`
+    <button class="btn bp bfull" onclick="openNewOT()" style="margin-bottom:.65rem"><i class="ti ti-plus"></i> Nueva OT</button>
+    <div style="display:flex;gap:.4rem;margin-bottom:.65rem">
+      <div style="position:relative;flex:1"><i class="ti ti-search" style="position:absolute;left:.55rem;top:50%;transform:translateY(-50%);color:var(--text3);font-size:13px"></i>
+        <input class="fi" id="qs" placeholder="Buscar..." oninput="filterOTs()" style="padding-left:1.9rem;font-size:13px"></div>
+      <select class="fs" id="qf" onchange="filterOTs()" style="width:100px;font-size:11px">
+        <option value="">Todos</option>
+        <option value="sin_iniciar">Sin iniciar</option>
+        <option value="en_ejecucion">En ejecución</option>
+        <option value="en_proceso">En proceso</option>
+        <option value="pausada">Pausada</option>
+        <option value="finalizada">Finalizada</option>
+      </select>
+    </div>
+    <div id="OL">${otList(vis,'openPlanDet')}</div>`;
+}
+function filterOTs(){
+  const q=(document.getElementById('qs').value||'').toLowerCase();
+  const f=document.getElementById('qf').value;
+  let l=visibleOTs();
+  if(q) l=l.filter(o=>o.id_ot.toLowerCase().includes(q)||o.nombre.toLowerCase().includes(q)||o.equipo_cod.toLowerCase().includes(q));
+  if(f) l=l.filter(o=>o.estado===f);
+  document.getElementById('OL').innerHTML=otList(l,'openPlanDet');
+}
+
+// ===================== NEW OT =====================
+function openNewOT(){
+  document.getElementById('m-ot-t').textContent='Nueva Orden de Trabajo';
+  const eqVis=visibleEquipos();
+  const newId='OT-'+String(S.nextOTNum).padStart(3,'0');
+  document.getElementById('m-ot-b').innerHTML=`
+    <div class="fg"><label class="fl">Número de OT</label><input class="fi" id="n-id" value="${newId}" readonly style="color:var(--acc);font-family:var(--fm)"></div>
+    <div class="fg"><label class="fl">Nombre del Trabajo</label><input class="fi" id="n-nom" placeholder="Ej: Mantención preventiva motor"></div>
+    <div class="fg"><label class="fl">Equipo</label><select class="fs" id="n-eq">${eqVis.map(e=>`<option value="${e.codigo_interno}">[${e.codigo_interno}] ${e.nombre}</option>`).join('')}</select></div>
+    <div class="r2">
+      <div class="fg"><label class="fl">Técnico</label><select class="fs" id="n-tec">${S.tecnicos.filter(t=>S.userSitio==='todos'||t.sucursal===S.userSitio).map(t=>`<option>${t.nombre}</option>`).join('')}</select></div>
+      <div class="fg"><label class="fl">Horas Prog.</label><input class="fi" id="n-hrs" type="number" min="1" value="4"></div>
+    </div>
+    <div class="fg"><label class="fl">Fecha</label><input class="fi" id="n-fecha" type="date" value="${today()}"></div>
+    <div class="fg"><label class="fl">Tareas (una por línea)</label><textarea class="fta" id="n-tar" placeholder="Cambio de aceite&#10;Revisión filtros&#10;Inspección general"></textarea></div>
+    <div class="fg"><label class="fl">Notas</label><textarea class="fta" id="n-not" placeholder="Observaciones..." style="min-height:50px"></textarea></div>
+    <button class="btn bp bfull" onclick="saveNewOT()"><i class="ti ti-device-floppy"></i> Crear OT</button>`;
+  document.getElementById('m-ot').classList.remove('hidden');
+}
+async function saveNewOT(){
+  const nom=document.getElementById('n-nom').value.trim();
+  if(!nom){alert('Ingresa nombre');return;}
+  const tar=(document.getElementById('n-tar').value.trim()||'Tarea general').split('\n').map(t=>t.trim()).filter(Boolean);
+  const eqCod=document.getElementById('n-eq').value;
+  const eq=getEq(eqCod);
+  const otData={
+    id_ot:document.getElementById('n-id').value,
+    nombre:nom,
+    equipo_cod:eqCod,
+    tecnico:document.getElementById('n-tec').value,
+    sucursal:eq.sucursal||S.userSitio,
+    horas_programadas:parseFloat(document.getElementById('n-hrs').value)||4,
+    horas_ejecutadas:0,
+    fecha_programada:document.getElementById('n-fecha').value,
+    estado:'sin_iniciar',avance_pct:0,
+    notas:document.getElementById('n-not').value,
+    tareas_json:JSON.stringify(tar.map(n=>({nombre:n,check:false})))
+  };
+  try{
+    const res=await supa.post('ots',otData);
+    S.ots.unshift(res[0]);
+    S.nextOTNum++;
+    cm('m-ot'); renderRole();
+  }catch(e){alert('Error al crear OT: '+e.message);}
+}
+
+// ===================== PLAN DETAIL =====================
+async function openPlanDet(id_ot){
+  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
+  const tareas=JSON.parse(o.tareas_json||'[]');
+  const done=tareas.filter(t=>t.check).length;
+  document.getElementById('m-det-t').textContent=o.id_ot;
+  document.getElementById('m-det-b').innerHTML=`
+    <div style="margin-bottom:.65rem">
+      <div class="ct">${o.nombre}</div>
+      <div class="cs">${eq.nombre} <span class="tag-tipo">${eq.codigo_interno}</span></div>
+    </div>
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.65rem">${eb(o)}<span class="hp">${o.horas_ejecutadas||0}/${o.horas_programadas}h</span><span style="font-size:11px;color:var(--text2);margin-left:auto">${fmtDate(o.fecha_programada)}</span></div>
+    <div class="card"><div style="font-size:10px;color:var(--text2)">Técnico</div><div>${o.tecnico}</div>
+      <div style="font-size:10px;color:var(--text2);margin-top:.4rem">Equipo</div>
+      <div style="font-size:12px">${eq.marca} ${eq.modelo} ${eq.anio}</div></div>
+    <div class="card"><div class="ct" style="margin-bottom:.35rem">Tareas (${done}/${tareas.length})</div>
+      ${tareas.map(t=>`<div class="tki"><div class="tkc ${t.check?'on':''}">${t.check?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':''}</div><span style="font-size:12px;${t.check?'text-decoration:line-through;color:var(--text2)':''}">${t.nombre}</span></div>`).join('')}
+    </div>
+    ${o.notas?`<div class="card"><div style="font-size:10px;color:var(--text2)">Notas</div><div style="font-size:12px">${o.notas}</div></div>`:''}
+    ${S.role==='admin'?`<div class="div"></div><button class="btn bd bsm" onclick="deleteOT('${id_ot}')"><i class="ti ti-trash"></i> Eliminar OT</button>`:''}`;
+  document.getElementById('m-det').classList.remove('hidden');
+}
+async function deleteOT(id_ot){
+  if(!confirm('¿Eliminar esta OT?')) return;
+  try{
+    await supa.delete('ots',`id_ot=eq.${id_ot}`);
+    S.ots=S.ots.filter(o=>o.id_ot!==id_ot);
+    cm('m-det'); renderRole();
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ===================== RESUMEN =====================
+function renderResumen(tc){
+  const ots=visibleOTs();
+  const eqs=[...new Set(ots.map(o=>o.equipo_cod))];
+  tc.innerHTML=`<div class="shd"><i class="ti ti-chart-bar"></i> Resumen por Equipo</div>
+  ${eqs.map(cod=>{
+    const eq=getEq(cod);
+    const eots=ots.filter(o=>o.equipo_cod===cod);
+    const tareasTot=eots.reduce((a,o)=>{const t=JSON.parse(o.tareas_json||'[]');return a+t.length;},0);
+    const tareasDone=eots.reduce((a,o)=>{const t=JSON.parse(o.tareas_json||'[]');return a+t.filter(x=>x.check).length;},0);
+    const hp=eots.reduce((a,o)=>a+(o.horas_programadas||0),0);
+    const he=eots.reduce((a,o)=>a+(o.horas_ejecutadas||0),0);
+    const pct=tareasTot?Math.round(tareasDone/tareasTot*100):0;
+    const maxH=Math.max(...eots.map(o=>o.horas_programadas||0),1);
+    return `<div class="card">
+      <div class="chd" style="margin-bottom:.4rem">
+        <div><div class="ct">${eq.nombre}</div><div class="cs">${eq.codigo_interno} · ${sitioBadge(eq.sucursal)}</div></div>
+        <span class="badge ${pct===100?'b-don':pct>50?'b-run':pct>0?'b-pen':'b-new'}">${pct}%</span>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:.25rem">Tareas: ${tareasDone}/${tareasTot} · Horas: ${he}/${hp}h</div>
+      ${pbw(pct)}
+      <div class="cwrap" style="margin-top:.5rem">
+        <div class="cleg"><div class="lgi"><div class="lgd" style="background:var(--acc2)"></div>Prog.</div><div class="lgi"><div class="lgd" style="background:var(--acc3)"></div>Ejec.</div></div>
+        <div class="cbars" style="height:70px;margin-top:.35rem">
+          ${eots.slice(0,8).map(o=>{
+            const ph=Math.round((o.horas_programadas||0)/maxH*100);
+            const pe=Math.round((o.horas_ejecutadas||0)/maxH*100);
+            return `<div style="flex:1;display:flex;flex-direction:column;align-items:center">
+              <div style="width:100%;display:flex;gap:1px;align-items:flex-end;height:58px">
+                <div class="bar pb-b" style="flex:1;height:${ph}%;opacity:.7"></div>
+                <div class="bar pb-g" style="flex:1;height:${pe}%"></div>
+              </div><div class="blbl">${o.id_ot.replace(/\D*/,'')}</div></div>`;
+          }).join('')}
+        </div>
+      </div>
+    </div>`;
+  }).join('')||`<div class="es"><i class="ti ti-chart-off"></i>Sin OTs</div>`}`;
+}
+
+// ===================== CUMPLIMIENTO =====================
+function renderCumplimiento(tc){
+  tc.innerHTML=`
+    <div style="background:var(--bg3);border:1px solid var(--border);border-radius:9px;padding:.65rem;margin-bottom:.65rem;display:flex;align-items:center;gap:.6rem">
+      <label style="font-size:11px;color:var(--text2);white-space:nowrap"><i class="ti ti-calendar"></i> Fecha:</label>
+      <input class="fi" type="date" id="cfd" value="${today()}" onchange="updCum()" style="flex:1">
+    </div><div id="cum-c"></div>`;
+  updCum();
+}
+function updCum(){
+  const fd=document.getElementById('cfd').value;
+  const ods=visibleOTs().filter(o=>o.fecha_programada===fd);
+  const comsDia=visibleCompromisos().filter(c=>c.fecha_limite===fd);
+  const tot=ods.length; const fin=ods.filter(o=>o.estado==='finalizada').length;
+  const paus=ods.filter(o=>o.estado==='pausada').length;
+  const cumpl=tot?Math.round(fin/tot*100):0;
+  const c=document.getElementById('cum-c');
+  if(!tot&&!comsDia.length){c.innerHTML=`<div class="es"><i class="ti ti-calendar-off"></i>Sin actividad para ${fmtDate(fd)}</div>`;return;}
+  c.innerHTML=`
+    <div class="sg">
+      <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">OTs del día</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${cumpl}%</div><div class="sl">Cumplimiento</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${fin}</div><div class="sl">Finalizadas</div></div>
+      <div class="sc"><div class="sv" style="color:var(--warn)">${paus}</div><div class="sl">Pausadas</div></div>
+    </div>
+    ${tot?`<div class="card"><div class="ct" style="margin-bottom:.35rem">Avance del día</div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:.2rem"><span>${fin}/${tot} finalizadas</span><span>${cumpl}%</span></div>
+      ${pbw(cumpl)}</div>`:``}
+    ${comsDia.length?`<div class="shd"><i class="ti ti-flag"></i> Compromisos del día</div>${comsDia.map(c=>comCard(c)).join('')}`:''}
+    ${ods.length?`<div class="shd"><i class="ti ti-list"></i> OTs del día</div>${ods.map(o=>otCard(o,'openPlanDet')).join('')}`:''}`;
+}
+
+// ===================== SUPERVISOR =====================
+function renderSup(){
+  const tabs=['Hoy','Semana','Compromisos','Inspecciones'];
+  document.getElementById('MC').innerHTML=`
+    <div class="nt">${tabs.map((t,i)=>`<button class="ntb ${S.tab===i?'on':''}" onclick="setTab(${i})">${t}</button>`).join('')}</div>
+    <div id="TC"></div>`;
+  [renderSupHoy,renderSupSemana,renderSupCompromisos,renderSupEval][S.tab](document.getElementById('TC'));
+}
+
+function renderSupHoy(tc){
+  const hoy=today();
+  const ots=visibleOTs().filter(o=>o.fecha_programada===hoy);
+  const activas=ots.filter(o=>o.estado!=='finalizada');
+  const fin=ots.filter(o=>o.estado==='finalizada');
+  const cumpl=ots.length?Math.round(fin.length/ots.length*100):0;
+  tc.innerHTML=`
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem">
+      <div style="font-size:12px;font-weight:500"><i class="ti ti-calendar" style="color:var(--acc2)"></i> ${fmtDate(hoy)}</div>
+    </div>
+    ${ots.length?`
+    <div style="display:flex;gap:.5rem;margin-bottom:.65rem;overflow-x:auto">
+      <div class="sc" style="flex:1;min-width:65px"><div class="sv" style="font-size:18px;color:var(--acc)">${ots.length}</div><div class="sl">Total</div></div>
+      <div class="sc" style="flex:1;min-width:65px"><div class="sv" style="font-size:18px;color:var(--acc2)">${activas.length}</div><div class="sl">Activas</div></div>
+      <div class="sc" style="flex:1;min-width:65px"><div class="sv" style="font-size:18px;color:var(--acc3)">${fin.length}</div><div class="sl">Listas</div></div>
+    </div>
+    <div class="card" style="margin-bottom:.65rem;padding:.6rem">
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:.2rem"><span>Cumplimiento hoy</span><span>${cumpl}%</span></div>
+      ${pbw(cumpl)}
+    </div>`:`<div class="card" style="text-align:center;padding:.75rem;margin-bottom:.65rem">
+      <i class="ti ti-calendar-check" style="font-size:22px;color:var(--acc2);display:block;margin-bottom:.25rem"></i>
+      <div style="font-size:12px;color:var(--text2)">Sin OTs para hoy</div></div>`}
+    ${activas.length?`<div class="shd"><i class="ti ti-tool"></i> Pendientes / En Curso (${activas.length})</div>${activas.map(o=>otCard(o,'openSupOT')).join('')}`:''}
+    ${fin.length?`<div class="shd"><i class="ti ti-circle-check" style="color:var(--acc3)"></i> Finalizadas (${fin.length})</div>${fin.map(o=>otCard(o,'openSupOT')).join('')}`:''}`;
+}
+
+function getWeekRange(){
+  const now=new Date(); now.setHours(0,0,0,0);
+  const day=now.getDay(); const diffLun=day===0?-6:1-day;
+  const lun=new Date(now); lun.setDate(now.getDate()+diffLun);
+  const dom=new Date(lun); dom.setDate(lun.getDate()+6);
+  return {lun,lunStr:lun.toISOString().split('T')[0],domStr:dom.toISOString().split('T')[0]};
+}
+
+function renderSupSemana(tc){
+  const {lun,lunStr,domStr}=getWeekRange();
+  const ots=visibleOTs().filter(o=>o.fecha_programada>=lunStr&&o.fecha_programada<=domStr);
+  const hoyStr=today();
+  const dias=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(lun); d.setDate(lun.getDate()+i);
+    const ds=d.toISOString().split('T')[0];
+    dias.push({ds,dOTs:ots.filter(o=>o.fecha_programada===ds),
+      nomDia:['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d.getDay()],dNum:d.getDate()});
+  }
+  const tot=ots.length; const fin=ots.filter(o=>o.estado==='finalizada').length;
+  const cumplSem=tot?Math.round(fin/tot*100):0;
+  tc.innerHTML=`
+    <div style="display:flex;gap:4px;margin-bottom:.75rem;overflow-x:auto">
+      ${dias.map(d=>{
+        const isHoy=d.ds===hoyStr;
+        const hasPaus=d.dOTs.some(o=>o.estado==='pausada');
+        const allFin=d.dOTs.length>0&&d.dOTs.every(o=>o.estado==='finalizada');
+        return `<div style="flex:1;min-width:38px;text-align:center;padding:.4rem .2rem;border-radius:8px;cursor:pointer;
+          background:${isHoy?'var(--acc2)':'var(--bg2)'};
+          border:1px solid ${isHoy?'var(--acc2)':hasPaus?'rgba(249,115,22,.4)':allFin?'rgba(16,185,129,.3)':d.dOTs.length?'var(--border2)':'var(--border)'}"
+          onclick="document.getElementById('sd-${d.ds}')?.scrollIntoView({behavior:'smooth'})">
+          <div style="font-size:9px;color:${isHoy?'rgba(255,255,255,.7)':'var(--text3)'}">${d.nomDia}</div>
+          <div style="font-size:13px;font-weight:600;color:${isHoy?'#fff':d.dOTs.length?'var(--text)':'var(--text3)'}">${d.dNum}</div>
+          ${d.dOTs.length?`<div style="font-size:8px;color:${isHoy?'rgba(255,255,255,.8)':allFin?'var(--acc3)':hasPaus?'var(--warn)':'var(--acc2)'}">${d.dOTs.length}</div>`:`<div style="font-size:8px;color:var(--text3)">—</div>`}
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="sg" style="margin-bottom:.65rem">
+      <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">OTs Semana</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${cumplSem}%</div><div class="sl">Cumplimiento</div></div>
+    </div>
+    ${dias.map(d=>d.dOTs.length?`<div id="sd-${d.ds}">
+      <div class="shd" style="color:${d.ds===hoyStr?'var(--acc2)':'var(--text)'}">
+        <i class="ti ti-calendar-event"></i>${d.nomDia} ${d.dNum}${d.ds===hoyStr?' · Hoy':''}
+        <span style="margin-left:auto;font-size:9px;color:var(--text3)">${d.dOTs.filter(o=>o.estado==='finalizada').length}/${d.dOTs.length}</span>
+      </div>
+      ${d.dOTs.map(o=>otCard(o,'openSupOT')).join('')}</div>`:'').join('')
+    ||`<div class="es"><i class="ti ti-calendar-off"></i>Sin OTs esta semana</div>`}`;
+}
+
+function renderSupCompromisos(tc){
+  const hoy=today();
+  const coms=visibleCompromisos().sort((a,b)=>a.fecha_limite.localeCompare(b.fecha_limite));
+  const vencidos=coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite<hoy);
+  const hoyList=coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite===hoy);
+  const proximos=coms.filter(c=>{
+    if(c.estado==='Entregado'||c.fecha_limite<=hoy) return false;
+    return Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000))<=7;
+  });
+  const resto=coms.filter(c=>{
+    if(c.estado==='Entregado'||c.fecha_limite<=hoy) return false;
+    return Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000))>7;
+  });
+  const entregados=coms.filter(c=>c.estado==='Entregado');
+  tc.innerHTML=`
+    <div class="sg" style="margin-bottom:.65rem">
+      <div class="sc"><div class="sv" style="color:var(--danger)">${vencidos.length}</div><div class="sl">Vencidos</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc)">${hoyList.length}</div><div class="sl">Vencen hoy</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc2)">${proximos.length}</div><div class="sl">Esta semana</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${entregados.length}</div><div class="sl">Entregados</div></div>
+    </div>
+    ${vencidos.length?`<div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Vencidos</div>${vencidos.map(c=>comCard(c)).join('')}`:''}
+    ${hoyList.length?`<div class="shd"><i class="ti ti-clock" style="color:var(--acc)"></i> Vencen hoy</div>${hoyList.map(c=>comCard(c)).join('')}`:''}
+    ${proximos.length?`<div class="shd"><i class="ti ti-calendar-week" style="color:var(--acc2)"></i> Próximos 7 días</div>${proximos.map(c=>comCard(c)).join('')}`:''}
+    ${resto.length?`<div class="shd"><i class="ti ti-calendar"></i> Más adelante</div>${resto.map(c=>comCard(c)).join('')}`:''}
+    ${entregados.length?`<div class="shd"><i class="ti ti-circle-check" style="color:var(--acc3)"></i> Entregados</div>${entregados.map(c=>comCard(c)).join('')}`:''}
+    ${!coms.length?`<div class="es"><i class="ti ti-flag-off"></i>Sin compromisos</div>`:''}`;
+}
+
+// ===================== DETALLE OT SUPERVISOR =====================
+async function openSupOT(id_ot){
+  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
+  const fin=o.estado==='finalizada';
+  const tareas=JSON.parse(o.tareas_json||'[]');
+  const chkDone=tareas.filter(t=>t.check).length;
+  const hoy=today();
+  const com=visibleCompromisos().find(c=>c.equipo_cod===eq.codigo_interno&&c.estado!=='Entregado');
+  let comAlert='';
+  if(com){
+    const diff=Math.round((new Date(com.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000));
+    const col=diff<0?'var(--danger)':diff<=3?'var(--acc)':'var(--acc3)';
+    const msg=diff<0?`⚠ ${Math.abs(diff)} día(s) ATRASADO`:diff===0?'⚠ Vence HOY':`Faltan ${diff} día(s)`;
+    comAlert=`<div class="card" style="border-color:${col};margin-bottom:.5rem">
+      <div style="font-size:11px;font-weight:500;color:${col}"><i class="ti ti-flag"></i> Fecha límite: ${fmtDate(com.fecha_limite)} · ${msg}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:.2rem">${com.objetivo} → ${com.destino_envio}</div>
+    </div>`;
+  }
+  // load reportes
+  let reportes=[];
+  try{reportes=await supa.get('reportes_avance',`ot_id=eq.${id_ot}&order=fecha_reporte.desc`);}catch(e){}
+
+  document.getElementById('m-det-t').textContent=`${o.id_ot}`;
+  document.getElementById('m-det-b').innerHTML=`
+    <div style="margin-bottom:.6rem">
+      <div style="font-size:12px;font-weight:500">${eq.nombre} <span class="tag-tipo">${eq.codigo_interno}</span></div>
+      <div style="font-size:11px;color:var(--text2)">${o.tecnico} · ${sitioBadge(o.sucursal)}</div>
+    </div>
+    ${comAlert}
+    ${!fin?`
+    <!-- ESTADO -->
+    <div class="card">
+      <div class="ct" style="margin-bottom:.35rem"><i class="ti ti-git-branch" style="color:var(--acc2)"></i> Estado: ${eb(o)}</div>
+      <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.35rem">
+        ${o.estado==='sin_iniciar'?`<button class="sf-btn" style="color:#6ee7b7;border-color:rgba(16,185,129,.4)" onclick="chgState('${id_ot}','en_ejecucion')"><i class="ti ti-player-play"></i> Iniciar OT</button>`:''}
+        ${['en_ejecucion','en_proceso'].includes(o.estado)?`<button class="sf-btn" onclick="openPausa('${id_ot}')"><i class="ti ti-player-pause"></i> Pausar</button>`:''}
+        ${o.estado==='pausada'?`<button class="sf-btn" style="color:#6ee7b7;border-color:rgba(16,185,129,.4)" onclick="chgState('${id_ot}','en_ejecucion')"><i class="ti ti-player-play"></i> Reanudar</button>`:''}
+      </div>
+    </div>
+    <!-- REGISTRAR AVANCE -->
+    <div class="card" style="border-color:rgba(245,158,11,.3)">
+      <div class="ct" style="margin-bottom:.6rem;color:var(--acc)"><i class="ti ti-chart-line"></i> Registrar Avance</div>
+      <div style="margin-bottom:.5rem">
+        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:.25rem">
+          <span>% Avance</span><span id="pv-lbl">${o.avance_pct||0}%</span>
+        </div>
+        <input type="range" id="pv" min="0" max="100" value="${o.avance_pct||0}" oninput="document.getElementById('pv-lbl').textContent=this.value+'%'">
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3)"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+      </div>
+      <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
+        <div style="flex:1">
+          <div style="font-size:10px;color:var(--text2);margin-bottom:.2rem;text-transform:uppercase;letter-spacing:.4px">Horas ejecutadas</div>
+          <div style="display:flex;align-items:center;gap:.4rem">
+            <input class="fi" id="hv" type="number" min="0" max="${o.horas_programadas}" step="0.5" value="${o.horas_ejecutadas||0}" style="width:75px;font-family:var(--fm)">
+            <span style="font-size:12px;color:var(--text2)">de ${o.horas_programadas}h</span>
+          </div>
+        </div>
+      </div>
+      <div class="fg">
+        <label class="fl">Notas de avance (opcional)</label>
+        <textarea class="fta" id="nv" style="min-height:50px">${o.notas||''}</textarea>
+      </div>
+      <!-- FOTO AVANCE (opcional) -->
+      <div class="fg">
+        <label class="fl">Foto de avance (opcional)</label>
+        <div class="pu" id="pu-av" onclick="document.getElementById('fi-av').click()">
+          <input type="file" id="fi-av" accept="image/*" capture="environment" onchange="handleFotoAvance(this)">
+          <i class="ti ti-camera" id="pu-av-icon"></i>
+          <div class="pu-txt" id="pu-av-txt">Toca para capturar foto</div>
+        </div>
+      </div>
+      <button class="btn bw bfull" onclick="saveAvance('${id_ot}')"><i class="ti ti-device-floppy"></i> Guardar Avance</button>
+    </div>
+    <!-- TAREAS -->
+    <div class="card">
+      <div class="ct" style="margin-bottom:.35rem">Tareas (${chkDone}/${tareas.length})</div>
+      ${pbw(Math.round(chkDone/Math.max(tareas.length,1)*100))}
+      <div style="margin-top:.35rem">
+        ${tareas.map((t,i)=>`<div class="tki" onclick="togTask('${id_ot}',${i})" style="cursor:pointer">
+          <div class="tkc ${t.check?'on':''}">${t.check?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':''}</div>
+          <span style="font-size:12px;${t.check?'text-decoration:line-through;color:var(--text2)':''}">${t.nombre}</span>
+        </div>`).join('')}
+      </div>
+    </div>
+    <!-- FOTO CIERRE -->
+    <div class="card">
+      <div class="ct" style="margin-bottom:.35rem"><i class="ti ti-camera" style="color:var(--danger)"></i> Foto de Cierre
+        <span style="color:var(--danger);font-size:10px;margin-left:.3rem">*Requerida para finalizar</span>
+      </div>
+      <div class="pu ${o.foto_cierre_url?'ok':''}" onclick="document.getElementById('fi-cierre').click()" id="pu-cierre">
+        <input type="file" id="fi-cierre" accept="image/*" capture="environment" onchange="handleFotoCierre('${id_ot}',this)">
+        <i class="ti ti-${o.foto_cierre_url?'photo-check':'camera'}"></i>
+        <div class="pu-txt">${o.foto_cierre_url?'Foto adjunta ✓ — toca para cambiar':'Toca para capturar foto de cierre'}</div>
+      </div>
+    </div>
+    <button class="btn bs bfull" onclick="finOT('${id_ot}')" ${!o.foto_cierre_url?'disabled':''}>
+      <i class="ti ti-circle-check"></i> Finalizar OT
+    </button>
+    ${!o.foto_cierre_url?`<div style="text-align:center;font-size:10px;color:var(--text2);margin-top:.25rem">Adjunta la foto de cierre para finalizar</div>`:''}`
+    :`<div class="card" style="text-align:center;padding:1.25rem;border-color:rgba(16,185,129,.3)">
+      <i class="ti ti-circle-check" style="font-size:32px;color:var(--acc3);display:block;margin-bottom:.35rem"></i>
+      <div style="font-weight:500;color:var(--acc3)">OT Finalizada</div>
+      ${o.foto_cierre_url?`<a href="${o.foto_cierre_url}" target="_blank" style="font-size:11px;color:var(--acc2)">Ver foto de cierre</a>`:''}
+    </div>`}
+    <!-- HISTORIAL REPORTES -->
+    ${reportes.length?`<div class="card" style="margin-top:.5rem">
+      <div class="ct" style="margin-bottom:.5rem"><i class="ti ti-history" style="color:var(--text2)"></i> Historial de Reportes (${reportes.length})</div>
+      ${reportes.map(r=>`<div style="border-bottom:1px solid var(--border);padding:.5rem 0">
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:.2rem">
+          <span style="font-weight:500;color:var(--acc)">${r.avance_pct}% avance · ${r.horas_ejecutadas}h</span>
+          <span style="color:var(--text3);font-family:var(--fm)">${fmtDT(r.fecha_reporte)}</span>
+        </div>
+        ${r.notas?`<div style="font-size:11px;color:var(--text2)">${r.notas}</div>`:''}
+        ${r.foto_url?`<a href="${r.foto_url}" target="_blank" style="font-size:11px;color:var(--acc2)"><i class="ti ti-photo"></i> Ver foto</a>`:''}
+      </div>`).join('')}
+      <div class="div"></div>
+      <button class="btn bg bsm bfull" onclick="generarPDF('${id_ot}')"><i class="ti ti-file-type-pdf"></i> Descargar PDF Reporte</button>
+    </div>`:''}
+  `;
+  document.getElementById('m-det').classList.remove('hidden');
+}
+
+// Foto avance (opcional)
+let _fotoAvanceFile=null;
+function handleFotoAvance(inp){
+  if(!inp.files||!inp.files[0]) return;
+  _fotoAvanceFile=inp.files[0];
+  document.getElementById('pu-av').classList.add('ok');
+  document.getElementById('pu-av-icon').className='ti ti-photo-check';
+  document.getElementById('pu-av-txt').textContent='Foto lista ✓';
+}
+
+async function handleFotoCierre(id_ot,inp){
+  if(!inp.files||!inp.files[0]) return;
+  const file=inp.files[0];
+  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
+  const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/foto_cierre.jpg`;
+  try{
+    const url=await supa.upload(path,file);
+    o.foto_cierre_url=url;
+    await supa.patch('ots',`id_ot=eq.${id_ot}`,{foto_cierre_url:url});
+    document.getElementById('pu-cierre').classList.add('ok');
+    document.getElementById('pu-cierre').innerHTML=`<input type="file" id="fi-cierre" accept="image/*" capture="environment" onchange="handleFotoCierre('${id_ot}',this)"><i class="ti ti-photo-check" style="font-size:22px;color:var(--acc3);display:block;margin-bottom:.3rem"></i><div class="pu-txt">Foto adjunta ✓</div>`;
+    document.querySelector(`button[onclick="finOT('${id_ot}')"]`)?.removeAttribute('disabled');
+  }catch(e){alert('Error al subir foto: '+e.message);}
+}
+
+async function saveAvance(id_ot){
+  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
+  const avance=parseInt(document.getElementById('pv').value)||0;
+  const horas=parseFloat(document.getElementById('hv').value)||0;
+  const notas=document.getElementById('nv').value;
+  let fotoUrl=null;
+  // subir foto de avance si hay
+  if(_fotoAvanceFile){
+    const ts=new Date().toISOString().replace(/[:.]/g,'-');
+    const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/avance_${ts}.jpg`;
+    try{fotoUrl=await supa.upload(path,_fotoAvanceFile);}catch(e){console.warn('Error foto avance',e);}
+    _fotoAvanceFile=null;
+  }
+  // guardar reporte de avance
+  const reporte={ot_id:id_ot,equipo_cod:o.equipo_cod,avance_pct:avance,horas_ejecutadas:horas,notas,foto_url:fotoUrl,supervisor:S.userName,
+    tareas_json:o.tareas_json};
+  try{await supa.post('reportes_avance',reporte);}catch(e){console.warn('Error reporte',e);}
+  // actualizar OT
+  let nuevoEstado=o.estado;
+  if(o.estado==='sin_iniciar'&&avance>0) nuevoEstado='en_ejecucion';
+  else if(avance>0&&!['pausada','finalizada'].includes(o.estado)) nuevoEstado='en_proceso';
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{avance_pct:avance,horas_ejecutadas:horas,notas,estado:nuevoEstado});
+  o.avance_pct=avance; o.horas_ejecutadas=horas; o.notas=notas; o.estado=nuevoEstado;
+  // generar PDF actualizado automáticamente
+  await generarPDF(id_ot, true);
+  openSupOT(id_ot);
+}
+
+async function togTask(id_ot,idx){
+  const o=S.ots.find(x=>x.id_ot===id_ot);
+  const tareas=JSON.parse(o.tareas_json||'[]');
+  tareas[idx].check=!tareas[idx].check;
+  const done=tareas.filter(t=>t.check).length;
+  const pct=Math.round(done/tareas.length*100);
+  o.tareas_json=JSON.stringify(tareas); o.avance_pct=pct;
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,avance_pct:pct});
+  openSupOT(id_ot);
+}
+
+function openPausa(id_ot){
+  document.getElementById('m-st-t').textContent='Motivo de Pausa';
+  document.getElementById('m-st-b').innerHTML=`
+    <div class="fg"><label class="fl">Motivo</label><textarea class="fta" id="pmot" placeholder="Describe el problema..."></textarea></div>
+    <button class="btn bw bfull" onclick="savePausa('${id_ot}')"><i class="ti ti-player-pause"></i> Confirmar Pausa</button>`;
+  document.getElementById('m-st').classList.remove('hidden');
+}
+async function savePausa(id_ot){
+  const mot=document.getElementById('pmot').value.trim()||'Sin motivo';
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{estado:'pausada',motivo_pausa:mot});
+  const o=S.ots.find(x=>x.id_ot===id_ot); o.estado='pausada'; o.motivo_pausa=mot;
+  addAlert('crit',`OT ${id_ot} Pausada`,mot);
+  cm('m-st'); openSupOT(id_ot);
+}
+async function chgState(id_ot,ns){
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{estado:ns});
+  const o=S.ots.find(x=>x.id_ot===id_ot); o.estado=ns;
+  openSupOT(id_ot);
+}
+async function finOT(id_ot){
+  const o=S.ots.find(x=>x.id_ot===id_ot);
+  if(!o.foto_cierre_url){alert('Requiere foto de cierre');return;}
+  const tareas=JSON.parse(o.tareas_json||'[]');
+  const allCheck=tareas.map(t=>({...t,check:true}));
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{estado:'finalizada',avance_pct:100,tareas_json:JSON.stringify(allCheck),horas_ejecutadas:o.horas_programadas});
+  o.estado='finalizada'; o.avance_pct=100; o.tareas_json=JSON.stringify(allCheck); o.horas_ejecutadas=o.horas_programadas;
+  await generarPDF(id_ot, true);
+  cm('m-det'); renderRole();
+}
+
+// ===================== PDF REPORT =====================
+async function generarPDF(id_ot, silent=false){
+  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
+  const tareas=JSON.parse(o.tareas_json||'[]');
+  const done=tareas.filter(t=>t.check).length;
+  let reportes=[];
+  try{reportes=await supa.get('reportes_avance',`ot_id=eq.${id_ot}&order=fecha_reporte.asc`);}catch(e){}
+
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210; const M=15;
+  let y=M;
+  // Header
+  doc.setFillColor(30,36,56); doc.rect(0,0,W,30,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(18); doc.setFont(undefined,'bold');
+  doc.text('MechOT',M,12);
+  doc.setFontSize(10); doc.setFont(undefined,'normal');
+  doc.text('Reporte de Orden de Trabajo',M,20);
+  doc.setFontSize(9); doc.text(`Generado: ${new Date().toLocaleString('es-CL')}`,W-M,20,{align:'right'});
+  y=38;
+  // OT Info
+  doc.setTextColor(30,36,56); doc.setFontSize(14); doc.setFont(undefined,'bold');
+  doc.text(`${o.id_ot} — ${o.nombre}`,M,y); y+=8;
+  doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(80,80,80);
+  doc.text(`Equipo: ${eq.nombre} [${eq.codigo_interno}]`,M,y); y+=5;
+  doc.text(`Técnico: ${o.tecnico} · Sucursal: ${o.sucursal}`,M,y); y+=5;
+  doc.text(`Fecha programada: ${fmtDate(o.fecha_programada)} · Estado: ${EC[o.estado]?.lbl||o.estado}`,M,y); y+=5;
+  doc.text(`Horas: ${o.horas_ejecutadas||0} ejecutadas / ${o.horas_programadas} programadas · Avance: ${o.avance_pct||0}%`,M,y); y+=8;
+  // Progress bar
+  doc.setFillColor(42,48,72); doc.rect(M,y,W-M*2,4,'F');
+  doc.setFillColor(59,130,246); doc.rect(M,y,(W-M*2)*(o.avance_pct||0)/100,4,'F');
+  y+=10;
+  // Tareas
+  doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.setTextColor(30,36,56);
+  doc.text('Tareas',M,y); y+=5;
+  tareas.forEach(t=>{
+    doc.setFontSize(9); doc.setFont(undefined,'normal');
+    doc.setTextColor(t.check?16:100,t.check?185:100,t.check?129:100);
+    doc.text(`${t.check?'✓':'○'} ${t.nombre}`,M+3,y); y+=5;
+  });
+  y+=4;
+  // Historial reportes
+  if(reportes.length){
+    doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.setTextColor(30,36,56);
+    doc.text('Historial de Reportes',M,y); y+=5;
+    reportes.forEach((r,i)=>{
+      if(y>260){doc.addPage();y=M;}
+      doc.setFillColor(245,246,250); doc.rect(M,y-4,W-M*2,14,'F');
+      doc.setFontSize(9); doc.setFont(undefined,'bold'); doc.setTextColor(59,130,246);
+      doc.text(`Reporte ${i+1} · ${fmtDT(r.fecha_reporte)}`,M+2,y); y+=5;
+      doc.setFont(undefined,'normal'); doc.setTextColor(80,80,80);
+      doc.text(`Avance: ${r.avance_pct}% · Horas: ${r.horas_ejecutadas}h · Supervisor: ${r.supervisor}`,M+2,y); y+=4;
+      if(r.notas){doc.text(`Notas: ${r.notas}`,M+2,y); y+=4;}
+      if(r.foto_url){doc.setTextColor(59,130,246);doc.text(`Foto: ${r.foto_url}`,M+2,y);y+=4;}
+      y+=3;
+    });
+  }
+  // Foto cierre
+  if(o.foto_cierre_url){
+    if(y>240){doc.addPage();y=M;}
+    doc.setFontSize(11); doc.setFont(undefined,'bold'); doc.setTextColor(30,36,56);
+    doc.text('Foto de Cierre',M,y); y+=5;
+    doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(59,130,246);
+    doc.text(o.foto_cierre_url,M,y); y+=6;
+  }
+  // Footer
+  doc.setFillColor(30,36,56); doc.rect(0,285,W,12,'F');
+  doc.setTextColor(150,150,180); doc.setFontSize(8);
+  doc.text(`MechOT · ${o.id_ot} · ${eq.nombre}`,M,292);
+
+  if(silent){
+    // Subir PDF a Supabase Storage
+    const pdfBlob=doc.output('blob');
+    const pdfFile=new File([pdfBlob],'reporte.pdf',{type:'application/pdf'});
+    const pdfPath=`${eq.codigo_interno}/${o.id_ot}_${o.nombre.replace(/\s+/g,'_')}/reporte.pdf`;
+    try{await supa.upload(pdfPath,pdfFile);}catch(e){console.warn('Error subir PDF',e);}
+  } else {
+    doc.save(`${o.id_ot}_${o.nombre.replace(/\s+/g,'_')}.pdf`);
+  }
+}
+
+// ===================== INSPECCIONES =====================
+function renderSupEval(tc){
+  tc.innerHTML=`
+    <div class="shd"><i class="ti ti-clipboard-check"></i> Tipo de Inspección</div>
+    ${[{tipo:'Estándar',icon:'ti-list-check',desc:'Check general de seguridad'},
+       {tipo:'Mecánico',icon:'ti-engine',desc:'Inspección técnica por tipo de equipo'},
+       {tipo:'Neumáticos',icon:'ti-circle',desc:'Presión, desgaste y estado'}
+    ].map(x=>`<div class="card" style="cursor:pointer" onclick="openEvalSel('${x.tipo}')">
+      <div style="display:flex;align-items:center;gap:.65rem">
+        <div class="ri" style="width:36px;height:36px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--acc2)"><i class="ti ${x.icon}"></i></div>
+        <div><div class="ct">${x.tipo}</div><div class="cs">${x.desc}</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--text3);margin-left:auto"></i>
+      </div></div>`).join('')}
+    <div class="shd"><i class="ti ti-history"></i> Recientes</div>
+    ${S.inspecciones.slice(0,5).map(ev=>`<div class="card">
+      <div class="chd">
+        <div><div class="ct" style="font-size:12px">${getEq(ev.equipo_cod).nombre}</div><div class="cs">${ev.tipo_inspeccion} · ${fmtDate(ev.fecha_inspeccion)}</div></div>
+        <div><span style="color:var(--acc3);font-size:12px">${ev.total_conformes}✓</span> <span style="color:var(--danger);font-size:12px">${ev.total_nc}✗</span></div>
+      </div></div>`).join('')||`<div class="es" style="padding:1rem"><i class="ti ti-clipboard"></i>Sin inspecciones</div>`}`;
+}
+
+function openEvalSel(tipo){
+  const eqVis=visibleEquipos();
+  document.getElementById('m-eval-b').innerHTML=`
+    <div class="fg"><label class="fl">Equipo a inspeccionar</label>
+      <select class="fs" id="ev-eq">${eqVis.map(e=>`<option value="${e.codigo_interno}" data-tipo="${e.tipo}">[${e.codigo_interno}] ${e.nombre}</option>`).join('')}</select></div>
+    <button class="btn bp bfull" onclick="startEval('${tipo}')"><i class="ti ti-clipboard-check"></i> Iniciar Inspección</button>`;
+  document.getElementById('m-eval').classList.remove('hidden');
+}
+
+function startEval(tipo){
+  const sel=document.getElementById('ev-eq');
+  const cod=sel.value; const tipoEq=sel.options[sel.selectedIndex].dataset.tipo||'Cargador';
+  const items=S.plantillas.filter(p=>p.tipo_inspeccion===tipo&&(p.tipo_equipo==='Todos'||p.tipo_equipo===tipoEq));
+  S.evalState={tipo,equipoCod:cod,tipoEq,items:items.map(p=>({name:p.item_inspeccion,estado:null,foto:null})),
+    fecha:new Date().toLocaleDateString('es-CL'),ts:new Date().toISOString()};
+  renderEvalForm();
+}
+
+function renderEvalForm(){
+  const st=S.evalState; const eq=getEq(st.equipoCod);
+  document.getElementById('m-eval-t').textContent=`${st.tipo} — ${eq.nombre}`;
+  document.getElementById('m-eval-b').innerHTML=`
+    <div style="font-size:12px;font-weight:500;color:var(--acc);margin-bottom:.5rem"><i class="ti ti-tractor"></i> ${eq.nombre} [${eq.codigo_interno}]</div>
+    <div style="display:flex;gap:.6rem;font-size:10px;color:var(--text2);margin-bottom:.65rem">
+      <span style="color:var(--acc3)">✓ Conforme</span><span style="color:var(--danger)">✗ No Conforme</span><span style="color:#94a3b8">N/A</span>
+    </div>
+    ${st.items.map((item,i)=>`<div class="ei" id="ei-${i}">
+      <div class="er"><span class="en">${item.name}</span>
+        <div class="eo">
+          <button class="eb ${item.estado==='ok'?'ok-on':''}" onclick="setEI(${i},'ok')">✓</button>
+          <button class="eb ${item.estado==='nc'?'nc-on':''}" onclick="setEI(${i},'nc')">✗</button>
+          <button class="eb ${item.estado==='na'?'na-on':''}" onclick="setEI(${i},'na')">N/A</button>
+        </div>
+      </div>
+      ${item.estado==='nc'?`<div class="ncph ${item.foto?'up':''}" onclick="document.getElementById('ef-${i}').click()">
+        <input type="file" id="ef-${i}" accept="image/*" capture="environment" onchange="handleEF(${i},this)">
+        ${item.foto?`<i class="ti ti-photo-check"></i> Foto ✓`:`<i class="ti ti-camera"></i> Foto requerida`}</div>`:''}
+    </div>`).join('')}
+    <div class="div"></div>
+    <button class="btn bw bfull" onclick="saveEval()"><i class="ti ti-device-floppy"></i> Guardar Inspección</button>`;
+}
+
+function setEI(i,v){S.evalState.items[i].estado=v;if(v!=='nc')S.evalState.items[i].foto=null;renderEvalForm();}
+function handleEF(i,inp){
+  if(!inp.files||!inp.files[0]) return;
+  const r=new FileReader();
+  r.onload=e=>{S.evalState.items[i].foto=e.target.result;renderEvalForm();};
+  r.readAsDataURL(inp.files[0]);
+}
+
+async function saveEval(){
+  const st=S.evalState; const eq=getEq(st.equipoCod);
+  const ncs=st.items.filter(i=>i.estado==='nc');
+  const sinFoto=ncs.filter(i=>!i.foto);
+  if(sinFoto.length){alert('Falta foto en: '+sinFoto.map(i=>i.name).join(', '));return;}
+  const idInsp='INSP-'+Date.now();
+  // subir fotos NC
+  for(const item of ncs){
+    if(item.foto){
+      try{
+        const blob=await(await fetch(item.foto)).blob();
+        const file=new File([blob],'nc.jpg',{type:'image/jpeg'});
+        const path=`${eq.codigo_interno}/inspecciones/${idInsp}_${item.name.replace(/\s+/g,'_')}.jpg`;
+        item.foto_url=await supa.upload(path,file);
+      }catch(e){console.warn(e);}
+    }
+  }
+  const insp={
+    id_inspeccion:idInsp,equipo_cod:st.equipoCod,
+    sucursal:eq.sucursal||S.userSitio,
+    tipo_inspeccion:st.tipo,inspector:S.userName,
+    total_conformes:st.items.filter(i=>i.estado==='ok').length,
+    total_nc:ncs.length,
+    total_na:st.items.filter(i=>i.estado==='na').length,
+    items_json:JSON.stringify(st.items.map(i=>({nombre:i.name,estado:i.estado,foto_url:i.foto_url||null}))),
+    fotos_nc_json:JSON.stringify(ncs.map(i=>({item:i.name,url:i.foto_url||null})))
+  };
+  try{
+    const res=await supa.post('inspecciones',insp);
+    S.inspecciones.unshift(res[0]);
+    if(ncs.length>0) addAlert('crit',`Inspección ${eq.nombre}`,`${ncs.length} no conforme(s) detectados`);
+    cm('m-eval'); renderRole();
+    alert(`✓ Inspección guardada\n${insp.total_conformes} conformes · ${insp.total_nc} no conformes`);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ===================== COMPROMISOS =====================
+function comCard(c){
+  const eq=getEq(c.equipo_cod);
+  const hoy=today();
+  const diff=Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000));
+  const vencido=c.estado!=='Entregado'&&diff<0;
+  const venceHoy=c.estado!=='Entregado'&&diff===0;
+  const cumplido=c.estado==='Entregado';
+  const borderCol=cumplido?'rgba(16,185,129,.3)':vencido?'rgba(239,68,68,.4)':venceHoy?'rgba(245,158,11,.5)':'var(--border)';
+  const statusTxt=cumplido?'✓ Entregado':vencido?`⚠ ${Math.abs(diff)}d atrasado`:venceHoy?'⚠ Vence HOY':`Faltan ${diff}d`;
+  const statusCol=cumplido?'var(--acc3)':vencido?'var(--danger)':venceHoy?'var(--acc)':'var(--text2)';
+  return `<div class="comcard" style="border-color:${borderCol}">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.35rem">
+      <div><div class="ct" style="font-size:13px">${eq.nombre}</div><div style="font-size:10px;color:var(--text3)">${eq.codigo_interno}</div></div>
+      <div style="text-align:right"><div style="font-size:11px;font-weight:600;color:${statusCol}">${statusTxt}</div><div style="font-size:10px;color:var(--text2);font-family:var(--fm)">${fmtDate(c.fecha_limite)}</div></div>
+    </div>
+    <div style="background:var(--bg3);border-radius:6px;padding:.4rem .6rem;margin-bottom:.35rem">
+      <div style="font-size:10px;color:var(--text2);margin-bottom:.15rem">Fecha límite entrega al taller</div>
+      <div style="font-size:12px"><i class="ti ti-flag" style="font-size:11px;color:var(--acc)"></i> ${c.objetivo}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:.15rem"><i class="ti ti-map-pin" style="font-size:10px"></i> ${c.destino_envio}</div>
+    </div>
+    ${!cumplido?`<button class="btn bs bsm" onclick="markEntregado('${c.id_compromiso}')"><i class="ti ti-check"></i> Marcar entregado</button>`:
+    `<div style="font-size:11px;color:var(--acc3)"><i class="ti ti-circle-check"></i> Entregado</div>`}
+  </div>`;
+}
+async function markEntregado(id_com){
+  await supa.patch('compromisos',`id_compromiso=eq.${id_com}`,{estado:'Entregado',fecha_entrega_real:today()});
+  const c=S.compromisos.find(x=>x.id_compromiso===id_com);
+  if(c){c.estado='Entregado';c.fecha_entrega_real=today();}
+  renderRole();
+}
+
+// ===================== JEFE =====================
+function renderJefe(){
+  const tabs=['Dashboard','OTs','Equipos','Compromisos','Cumplimiento'];
+  document.getElementById('MC').innerHTML=`
+    <div class="nt">${tabs.map((t,i)=>`<button class="ntb ${S.tab===i?'on':''}" onclick="setTab(${i})">${t}</button>`).join('')}</div>
+    <div id="TC"></div>`;
+  [renderJefeDash,()=>document.getElementById('TC').innerHTML=otList(visibleOTs(),'openPlanDet'),renderEquipos,renderCompromisos,renderCumplimiento][S.tab](document.getElementById('TC'));
+}
+
+function renderJefeDash(tc){
+  const ots=visibleOTs();
+  const tot=ots.length; const fin=ots.filter(o=>o.estado==='finalizada').length;
+  const paus=ots.filter(o=>o.estado==='pausada').length;
+  const cumpl=tot?Math.round(fin/tot*100):0;
+  const hoy=today();
+  const atras=ots.filter(o=>o.estado!=='finalizada'&&o.fecha_programada<hoy);
+  const comVenc=visibleCompromisos().filter(c=>c.estado!=='Entregado'&&c.fecha_limite<hoy);
+  tc.innerHTML=`
+    <div class="sg">
+      <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">Total OTs</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${cumpl}%</div><div class="sl">Cumplimiento</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc2)">${ots.filter(o=>['en_ejecucion','en_proceso'].includes(o.estado)).length}</div><div class="sl">En Curso</div></div>
+      <div class="sc"><div class="sv" style="color:var(--warn)">${paus}</div><div class="sl">Pausadas</div></div>
+    </div>
+    ${comVenc.length?`<div class="card" style="border-color:rgba(239,68,68,.3)">
+      <div class="ct" style="color:var(--danger);margin-bottom:.35rem"><i class="ti ti-alert-triangle"></i> ${comVenc.length} compromiso(s) vencido(s)</div>
+      ${comVenc.map(c=>`<div style="font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)">${getEq(c.equipo_cod).nombre} · ${fmtDate(c.fecha_limite)}</div>`).join('')}
+    </div>`:''}
+    ${atras.length?`<div class="card" style="border-color:rgba(239,68,68,.2)">
+      <div class="ct" style="color:var(--danger);margin-bottom:.35rem"><i class="ti ti-clock-off"></i> OTs Atrasadas (${atras.length})</div>
+      ${atras.map(o=>`<div style="font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)">${o.id_ot} · ${o.nombre} · ${fmtDate(o.fecha_programada)}</div>`).join('')}
+    </div>`:''}
+    <div class="card">
+      <div class="ct" style="margin-bottom:.5rem">Por Técnico</div>
+      ${[...new Set(ots.map(o=>o.tecnico))].map(t=>{
+        const to=ots.filter(o=>o.tecnico===t);
+        const tf=to.filter(o=>o.estado==='finalizada').length;
+        const tp=Math.round(tf/to.length*100);
+        return `<div style="margin-bottom:.55rem"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:.2rem"><span>${t}</span><span style="font-family:var(--fm);color:var(--text2);font-size:11px">${tf}/${to.length}</span></div>${pbw(tp)}</div>`;
+      }).join('')||'<div style="font-size:12px;color:var(--text2)">Sin datos</div>'}
+    </div>`;
+}
+
+function renderEquipos(tc){
+  const eqs=visibleEquipos();
+  tc.innerHTML=`<div class="shd"><i class="ti ti-tractor"></i> Equipos (${eqs.length})</div>
+  ${eqs.map(e=>{
+    const eots=S.ots.filter(o=>o.equipo_cod===e.codigo_interno);
+    const act=eots.filter(o=>o.estado!=='finalizada').length;
+    return `<div class="eqcard" onclick="openEqDetail('${e.codigo_interno}')">
+      <div class="eqinitials">${e.codigo_interno.substring(0,4)}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-weight:500;font-size:13px">${e.nombre}</div>
+        <div style="font-size:11px;color:var(--text2)">${e.marca} ${e.modelo} · ${e.anio}</div>
+        <div style="display:flex;gap:.35rem;margin-top:.2rem;flex-wrap:wrap">
+          <span class="tag-tipo">${e.tipo}</span>
+          ${act?`<span class="badge b-run" style="font-size:9px">${act} activa${act>1?'s':''}</span>`:''}
+        </div>
+      </div>
+      <i class="ti ti-chevron-right" style="color:var(--text3)"></i>
+    </div>`;
+  }).join('')||`<div class="es"><i class="ti ti-tractor"></i>Sin equipos</div>`}`;
+}
+
+function openEqDetail(cod){
+  const e=getEq(cod);
+  const eots=S.ots.filter(o=>o.equipo_cod===cod);
+  const activas=eots.filter(o=>o.estado!=='finalizada');
+  const fin=eots.filter(o=>o.estado==='finalizada');
+  const hP=eots.reduce((a,o)=>a+(o.horas_programadas||0),0);
+  const hE=eots.reduce((a,o)=>a+(o.horas_ejecutadas||0),0);
+  const tareasTot=eots.reduce((a,o)=>{const t=JSON.parse(o.tareas_json||'[]');return a+t.length;},0);
+  const tareasDone=eots.reduce((a,o)=>{const t=JSON.parse(o.tareas_json||'[]');return a+t.filter(x=>x.check).length;},0);
+  const pct=tareasTot?Math.round(tareasDone/tareasTot*100):0;
+  const com=visibleCompromisos().find(c=>c.equipo_cod===cod&&c.estado!=='Entregado');
+  document.getElementById('m-det-t').textContent=e.codigo_interno;
+  document.getElementById('m-det-b').innerHTML=`
+    <div style="margin-bottom:.75rem">
+      <div style="font-weight:600;font-size:15px">${e.nombre}</div>
+      <div style="font-size:12px;color:var(--text2)">${e.marca} ${e.modelo} · ${e.anio}</div>
+      <div style="margin-top:.25rem"><span class="tag-tipo">${e.tipo}</span></div>
+    </div>
+    <div class="sg">
+      <div class="sc"><div class="sv" style="color:var(--acc)">${eots.length}</div><div class="sl">OTs Total</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${pct}%</div><div class="sl">Avance</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc2)">${hE}h</div><div class="sl">Hrs Ejec.</div></div>
+      <div class="sc"><div class="sv" style="color:var(--text2)">${hP}h</div><div class="sl">Hrs Prog.</div></div>
+    </div>
+    <div class="card">${pbw(pct)}<div style="font-size:11px;color:var(--text2);margin-top:.25rem">Tareas: ${tareasDone}/${tareasTot}</div></div>
+    ${com?`<div class="card" style="border-color:rgba(245,158,11,.35)">
+      <div class="ct" style="margin-bottom:.25rem"><i class="ti ti-flag" style="color:var(--acc)"></i> Compromiso pendiente</div>
+      <div style="font-size:12px">${com.objetivo}</div>
+      <div style="font-size:11px;color:var(--text2)"><i class="ti ti-calendar"></i> ${fmtDate(com.fecha_limite)} · ${com.destino_envio}</div>
+    </div>`:''}
+    ${activas.length?`<div class="shd"><i class="ti ti-tool"></i> OTs Activas (${activas.length})</div>${activas.map(o=>otCard(o,'openPlanDet')).join('')}`:''}
+    ${fin.length?`<div class="shd"><i class="ti ti-circle-check" style="color:var(--acc3)"></i> Finalizadas (${fin.length})</div>${fin.map(o=>otCard(o,'openPlanDet')).join('')}`:''}
+    ${!eots.length?`<div class="es" style="padding:1rem"><i class="ti ti-clipboard-off"></i>Sin OTs</div>`:''}`;
+  document.getElementById('m-det').classList.remove('hidden');
+}
+
+function renderCompromisos(tc){
+  const hoy=today();
+  const coms=visibleCompromisos().sort((a,b)=>a.fecha_limite.localeCompare(b.fecha_limite));
+  const pend=coms.filter(c=>c.estado!=='Entregado');
+  const done=coms.filter(c=>c.estado==='Entregado');
+  const venc=pend.filter(c=>c.fecha_limite<hoy).length;
+  const prox=pend.filter(c=>{const d=Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000));return d>=0&&d<=3;}).length;
+  tc.innerHTML=`
+    ${venc||prox?`<div class="card" style="border-color:rgba(239,68,68,.3);margin-bottom:.65rem">
+      <div class="ct" style="color:var(--danger);margin-bottom:.3rem"><i class="ti ti-alert-triangle"></i> Atención</div>
+      ${venc?`<div style="font-size:12px;color:var(--danger)">${venc} equipo(s) con fecha límite vencida</div>`:''}
+      ${prox?`<div style="font-size:12px;color:var(--acc)">${prox} equipo(s) con entrega en ≤ 3 días</div>`:''}
+    </div>`:''}
+    <div class="shd"><i class="ti ti-flag"></i> Pendientes (${pend.length})</div>
+    ${pend.map(c=>comCard(c)).join('')||`<div class="es" style="padding:1rem"><i class="ti ti-check"></i>Sin entregas pendientes</div>`}
+    ${done.length?`<div class="shd"><i class="ti ti-circle-check" style="color:var(--acc3)"></i> Entregados (${done.length})</div>${done.map(c=>comCard(c)).join('')}`:''}`;
+}
+
+// ===================== ADMIN =====================
+function renderAdmin(){
+  const tabs=['KPIs','Usuarios','Equipos','Compromisos','Inspecciones'];
+  document.getElementById('MC').innerHTML=`
+    <div class="nt">${tabs.map((t,i)=>`<button class="ntb ${S.tab===i?'on':''}" onclick="setTab(${i})">${t}</button>`).join('')}</div>
+    <div id="TC"></div>`;
+  [renderAdminKPIs,renderAdminUsuarios,renderEquipos,renderCompromisos,renderAdminInspecciones][S.tab](document.getElementById('TC'));
+}
+
+function renderAdminKPIs(tc){
+  const ots=S.ots; const hoy=today();
+  const tot=ots.length; const fin=ots.filter(o=>o.estado==='finalizada').length;
+  const paus=ots.filter(o=>o.estado==='pausada').length;
+  const cumpl=tot?Math.round(fin/tot*100):0;
+  const hP=ots.reduce((a,o)=>a+(o.horas_programadas||0),0);
+  const hE=ots.reduce((a,o)=>a+(o.horas_ejecutadas||0),0);
+  const efic=hP?Math.round(hE/hP*100):0;
+  const atras=ots.filter(o=>o.estado!=='finalizada'&&o.fecha_programada<hoy);
+  const comVenc=S.compromisos.filter(c=>c.estado!=='Entregado'&&c.fecha_limite<hoy);
+  const ncTotal=S.inspecciones.reduce((a,i)=>a+(i.total_nc||0),0);
+  tc.innerHTML=`
+    ${(atras.length||comVenc.length)?`<div class="card" style="border-color:rgba(239,68,68,.35);margin-bottom:.65rem">
+      <div class="ct" style="color:var(--danger);margin-bottom:.3rem"><i class="ti ti-alert-triangle"></i> Atención Requerida</div>
+      ${atras.length?`<div style="font-size:12px;color:var(--danger)">${atras.length} OT(s) atrasada(s)</div>`:''}
+      ${comVenc.length?`<div style="font-size:12px;color:var(--danger)">${comVenc.length} compromiso(s) vencido(s)</div>`:''}
+    </div>`:''}
+    <div class="shd"><i class="ti ti-dashboard"></i> General</div>
+    <div class="sg">
+      <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">Total OTs</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${cumpl}%</div><div class="sl">Cumplimiento</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc2)">${ots.filter(o=>['en_ejecucion','en_proceso'].includes(o.estado)).length}</div><div class="sl">En Curso</div></div>
+      <div class="sc"><div class="sv" style="color:var(--warn)">${paus}</div><div class="sl">Pausadas</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc)">${efic}%</div><div class="sl">Efic. Horas</div></div>
+      <div class="sc"><div class="sv" style="color:${ncTotal>0?'var(--danger)':'var(--acc3)'}">${ncTotal}</div><div class="sl">No Conformes</div></div>
+    </div>
+    <div class="card">
+      <div class="ct" style="margin-bottom:.35rem">Horas ejecutadas vs programadas</div>
+      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:.2rem"><span>${hE}h ejecutadas</span><span>${hP}h programadas</span></div>
+      ${pbw(efic)}
+    </div>
+    <div class="shd"><i class="ti ti-building"></i> Por Sucursal</div>
+    ${['Lo Pinto','La Negra'].map(suc=>{
+      const sOTs=ots.filter(o=>o.sucursal===suc);
+      const sFin=sOTs.filter(o=>o.estado==='finalizada').length;
+      const sPct=sOTs.length?Math.round(sFin/sOTs.length*100):0;
+      return `<div class="card" style="margin-bottom:.45rem">
+        <div class="chd" style="margin-bottom:.35rem">
+          <div><div class="ct">${suc}</div><div class="cs">${sOTs.length} OTs · ${sFin} finalizadas</div></div>
+          <span class="badge ${sPct>=80?'b-don':sPct>=50?'b-run':'b-pau'}">${sPct}%</span>
+        </div>${pbw(sPct)}</div>`;
+    }).join('')}
+    <div class="shd"><i class="ti ti-users"></i> Por Técnico</div>
+    <div class="card">
+      ${[...new Set(ots.map(o=>o.tecnico))].map(t=>{
+        const to=ots.filter(o=>o.tecnico===t);
+        const tf=to.filter(o=>o.estado==='finalizada').length;
+        const tp=Math.round(tf/to.length*100);
+        return `<div style="margin-bottom:.55rem"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:.2rem"><span>${t}</span><span style="font-family:var(--fm);color:var(--text2);font-size:11px">${tf}/${to.length}</span></div>${pbw(tp)}</div>`;
+      }).join('')||'<div style="font-size:12px;color:var(--text2)">Sin datos</div>'}
+    </div>`;
+}
+
+function renderAdminUsuarios(tc){
+  const rolCfg={admin:{cls:'b-new',lbl:'Admin'},jefe:{cls:'b-pen',lbl:'Jefe'},planificador:{cls:'b-run',lbl:'Planificador'},supervisor:{cls:'b-don',lbl:'Supervisor'}};
+  tc.innerHTML=`
+    <button class="btn bp bfull" onclick="openNewUsuario()" style="margin-bottom:.65rem"><i class="ti ti-user-plus"></i> Nuevo Usuario</button>
+    <div class="shd"><i class="ti ti-users"></i> Usuarios (${S.usuarios.length})</div>
+    ${S.usuarios.map(u=>`<div class="card" style="margin-bottom:.5rem">
+      <div style="display:flex;align-items:center;gap:.65rem">
+        <div style="width:36px;height:36px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--acc2);flex-shrink:0"><i class="ti ti-user"></i></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-weight:500;font-size:13px">${u.nombre}</div>
+          <div style="font-size:11px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${u.email}</div>
+          <div style="display:flex;gap:.35rem;margin-top:.2rem">
+            <span class="badge ${rolCfg[u.rol]?.cls||'b-new'}">${rolCfg[u.rol]?.lbl||u.rol}</span>
+            <span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(139,92,246,.1);color:#c4b5fd;border:1px solid rgba(139,92,246,.25)">${u.sucursal}</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:.35rem">
+          <button class="btn bg bsm" onclick="openEditUsuario('${u.id}')"><i class="ti ti-edit"></i></button>
+          ${u.rol!=='admin'?`<button class="btn bd bsm" onclick="deleteUsuario('${u.id}')"><i class="ti ti-trash"></i></button>`:''}
+        </div>
+      </div>
+    </div>`).join('')}`;
+}
+
+function openNewUsuario(){
+  document.getElementById('m-usr-t').textContent='Nuevo Usuario';
+  document.getElementById('m-usr-b').innerHTML=usuarioForm({id:'',email:'',nombre:'',rol:'supervisor',sucursal:'Lo Pinto'},'saveNewUsuario()');
+  document.getElementById('m-usr').classList.remove('hidden');
+}
+function openEditUsuario(id){
+  const u=S.usuarios.find(x=>x.id===id);
+  document.getElementById('m-usr-t').textContent='Editar Usuario';
+  document.getElementById('m-usr-b').innerHTML=usuarioForm(u,`saveEditUsuario('${id}')`);
+  document.getElementById('m-usr').classList.remove('hidden');
+}
+function usuarioForm(u,saveFn){
+  return `
+    <div class="fg"><label class="fl">Nombre completo</label><input class="fi" id="u-nom" value="${u.nombre||''}" placeholder="Ej: Carlos Rojas"></div>
+    <div class="fg"><label class="fl">Email (para ingresar)</label><input class="fi" id="u-email" type="email" value="${u.email||''}" placeholder="carlos@empresa.cl"></div>
+    <div class="r2">
+      <div class="fg"><label class="fl">Rol</label><select class="fs" id="u-rol" onchange="toggleSucFld(this.value)">
+        <option ${u.rol==='supervisor'?'selected':''}>supervisor</option>
+        <option ${u.rol==='planificador'?'selected':''}>planificador</option>
+        <option ${u.rol==='jefe'?'selected':''}>jefe</option>
+        <option ${u.rol==='admin'?'selected':''}>admin</option>
+      </select></div>
+      <div class="fg" id="suc-fld" ${u.rol==='admin'?'style="opacity:.4;pointer-events:none"':''}>
+        <label class="fl">Sucursal</label><select class="fs" id="u-suc">
+          <option ${u.sucursal==='Lo Pinto'?'selected':''}>Lo Pinto</option>
+          <option ${u.sucursal==='La Negra'?'selected':''}>La Negra</option>
+          <option ${u.sucursal==='todos'?'selected':''}>todos</option>
+        </select>
+      </div>
+    </div>
+    <div style="font-size:11px;color:var(--text2);background:var(--bg3);border-radius:7px;padding:.5rem .65rem;margin-bottom:.75rem">
+      <i class="ti ti-info-circle" style="color:var(--acc2)"></i> El usuario ingresa escribiendo su email. Sin contraseña.
+    </div>
+    <button class="btn bp bfull" onclick="${saveFn}"><i class="ti ti-device-floppy"></i> Guardar</button>`;
+}
+function toggleSucFld(rol){
+  const sf=document.getElementById('suc-fld');
+  if(rol==='admin'){sf.style.opacity='.4';sf.style.pointerEvents='none';document.getElementById('u-suc').value='todos';}
+  else{sf.style.opacity='1';sf.style.pointerEvents='';}
+}
+async function saveNewUsuario(){
+  const d={email:document.getElementById('u-email').value.trim().toLowerCase(),nombre:document.getElementById('u-nom').value.trim(),rol:document.getElementById('u-rol').value,sucursal:document.getElementById('u-suc').value};
+  if(!d.email||!d.nombre){alert('Completa email y nombre');return;}
+  try{const res=await supa.post('usuarios',d);S.usuarios.push(res[0]);cm('m-usr');renderRole();}
+  catch(e){alert('Error: '+e.message);}
+}
+async function saveEditUsuario(id){
+  const d={email:document.getElementById('u-email').value.trim().toLowerCase(),nombre:document.getElementById('u-nom').value.trim(),rol:document.getElementById('u-rol').value,sucursal:document.getElementById('u-suc').value};
+  if(!d.email||!d.nombre){alert('Completa email y nombre');return;}
+  try{
+    await supa.patch('usuarios',`id=eq.${id}`,d);
+    const idx=S.usuarios.findIndex(u=>u.id===id);
+    if(idx>=0) S.usuarios[idx]={...S.usuarios[idx],...d};
+    cm('m-usr'); renderRole();
+  }catch(e){alert('Error: '+e.message);}
+}
+async function deleteUsuario(id){
+  if(!confirm('¿Eliminar este usuario?')) return;
+  try{await supa.delete('usuarios',`id=eq.${id}`);S.usuarios=S.usuarios.filter(u=>u.id!==id);renderRole();}
+  catch(e){alert('Error: '+e.message);}
+}
+
+function renderAdminInspecciones(tc){
+  tc.innerHTML=`
+    <div class="shd"><i class="ti ti-clipboard-check"></i> Inspecciones registradas (${S.inspecciones.length})</div>
+    ${S.inspecciones.slice(0,20).map(ev=>`<div class="card" style="margin-bottom:.4rem">
+      <div class="chd">
+        <div><div class="ct" style="font-size:12px">${getEq(ev.equipo_cod).nombre}</div>
+          <div class="cs">${ev.tipo_inspeccion} · ${ev.inspector} · ${fmtDT(ev.fecha_inspeccion)}</div></div>
+        <div><span style="color:var(--acc3);font-size:12px">${ev.total_conformes}✓</span> <span style="color:var(--danger);font-size:12px">${ev.total_nc}✗</span></div>
+      </div></div>`).join('')||`<div class="es"><i class="ti ti-clipboard"></i>Sin inspecciones</div>`}`;
+}
+
+// ===================== MODAL OUTSIDE CLICK =====================
+document.querySelectorAll('.mo').forEach(m=>m.addEventListener('click',function(e){if(e.target===this)this.classList.add('hidden');}));
+</script>
+</body>
+</html>
