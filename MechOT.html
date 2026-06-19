@@ -262,6 +262,7 @@ const S={
   userSitio:'todos',
   eqFiltro:'',
   areaFiltro:'todos',
+  inspFiltro:'todas',
   alerts:[],
   // local cache
   ots:[],equipos:[],tecnicos:[],compromisos:[],inspecciones:[],
@@ -1521,8 +1522,14 @@ function renderEquipos(tc){
   const hoy=today();
   const {lunStr,domStr}=getWeekRange();
 
-  // Filtros
   tc.innerHTML=`
+    <!-- BUSCADOR -->
+    <div style="position:relative;margin-bottom:.65rem">
+      <i class="ti ti-search" style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);color:var(--text3);font-size:14px"></i>
+      <input class="fi" id="eq-search" placeholder="Buscar por código o nombre..."
+        oninput="filterEquipos()" style="padding-left:2.4rem;font-size:13px">
+    </div>
+    <!-- FILTROS -->
     <div style="display:flex;gap:.35rem;margin-bottom:.65rem;flex-wrap:wrap">
       <button class="btn bg bsm ${!S.eqFiltro||S.eqFiltro===''?'bp':''}" onclick="S.eqFiltro='';renderRole()">Todos (${eqs.length})</button>
       <button class="btn bg bsm" style="${S.eqFiltro==='En Proceso'?'background:var(--acc2);color:#fff':''}" onclick="S.eqFiltro='En Proceso';renderRole()">En Proceso (${eqs.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso').length})</button>
@@ -1531,6 +1538,22 @@ function renderEquipos(tc){
       <button class="btn bg bsm" style="${S.eqFiltro==='semana'?'background:var(--acc);color:#1a1d26':''}" onclick="S.eqFiltro='semana';renderRole()">Esta semana</button>
     </div>
     <div id="EQL">${buildEqList(eqs, hoy, lunStr, domStr)}</div>`;
+}
+
+function filterEquipos(){
+  const q=(document.getElementById('eq-search').value||'').toLowerCase();
+  const hoy=today();
+  const {lunStr,domStr}=getWeekRange();
+  let eqs=visibleEquipos();
+  if(q) eqs=eqs.filter(e=>
+    e.codigo_interno.toLowerCase().includes(q)||
+    e.nombre.toLowerCase().includes(q)||
+    (e.tipo||'').toLowerCase().includes(q)||
+    (e.marca||'').toLowerCase().includes(q)||
+    (e.modelo||'').toLowerCase().includes(q)||
+    (e.ubicacion||'').toLowerCase().includes(q)
+  );
+  document.getElementById('EQL').innerHTML=buildEqList(eqs, hoy, lunStr, domStr);
 }
 
 function buildEqList(eqs, hoy, lunStr, domStr){
@@ -1670,7 +1693,28 @@ function openEqDetail(cod){
 
     ${activas.length?`<div class="shd"><i class="ti ti-tool"></i> OTs Activas (${activas.length})</div>${activas.map(o=>otCard(o,S.role==='supervisor'?'openSupOT':'openPlanDet')).join('')}`:''}
     ${fin.length?`<div class="shd"><i class="ti ti-circle-check" style="color:var(--acc3)"></i> Finalizadas (${fin.length})</div>${fin.map(o=>otCard(o,'openPlanDet')).join('')}`:''}
-    ${!eots.length?`<div class="es" style="padding:1rem"><i class="ti ti-clipboard-off"></i>Sin OTs</div>`:''}`;
+    ${!eots.length?`<div class="es" style="padding:1rem"><i class="ti ti-clipboard-off"></i>Sin OTs</div>`:''}
+
+    <!-- INSPECCIONES DEL EQUIPO -->
+    ${(()=>{
+      const inspsEq=S.inspecciones.filter(i=>i.equipo_cod===cod);
+      if(!inspsEq.length) return `<div class="shd"><i class="ti ti-clipboard-check"></i> Inspecciones</div><div class="es" style="padding:.75rem"><i class="ti ti-clipboard"></i>Sin inspecciones registradas</div>`;
+      return `<div class="shd"><i class="ti ti-clipboard-check"></i> Inspecciones (${inspsEq.length})</div>
+      ${inspsEq.slice(0,5).map(ev=>`<div class="card" style="cursor:pointer;margin-bottom:.4rem" onclick="verInspeccion('${ev.id_inspeccion}')">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:12px;font-weight:500">${ev.tipo_inspeccion}</div>
+            <div style="font-size:11px;color:var(--text2)">${ev.inspector} · ${fmtDT(ev.fecha_inspeccion)}</div>
+          </div>
+          <div style="text-align:right">
+            <span style="color:var(--acc3);font-size:13px;font-weight:600">${ev.total_conformes}✓</span>
+            <span style="color:var(--danger);font-size:13px;font-weight:600;margin-left:.35rem">${ev.total_nc}✗</span>
+            ${ev.total_nc>0?`<div style="font-size:9px;color:var(--danger)">Ver detalle →</div>`:''}
+          </div>
+        </div>
+      </div>`).join('')}
+      ${inspsEq.length>5?`<div style="font-size:11px;color:var(--text2);text-align:center;padding:.35rem">y ${inspsEq.length-5} más...</div>`:''}`;
+    })()}`;
   document.getElementById('m-det').classList.remove('hidden');
 }
 
@@ -2061,14 +2105,61 @@ async function deleteUsuario(id){
 }
 
 function renderAdminInspecciones(tc){
+  const todas=S.inspecciones;
+  const conNC=todas.filter(i=>i.total_nc>0);
+  const hoy=today();
+  const hoyList=todas.filter(i=>i.fecha_inspeccion&&i.fecha_inspeccion.startsWith(hoy));
+
+  // Filtro activo
+  if(!S.inspFiltro) S.inspFiltro='todas';
+  let lista=todas;
+  if(S.inspFiltro==='nc') lista=conNC;
+  else if(S.inspFiltro==='hoy') lista=hoyList;
+
   tc.innerHTML=`
-    <div class="shd"><i class="ti ti-clipboard-check"></i> Inspecciones registradas (${S.inspecciones.length})</div>
-    ${S.inspecciones.slice(0,20).map(ev=>`<div class="card" style="margin-bottom:.4rem">
-      <div class="chd">
-        <div><div class="ct" style="font-size:12px">${getEq(ev.equipo_cod).nombre}</div>
-          <div class="cs">${ev.tipo_inspeccion} · ${ev.inspector} · ${fmtDT(ev.fecha_inspeccion)}</div></div>
-        <div><span style="color:var(--acc3);font-size:12px">${ev.total_conformes}✓</span> <span style="color:var(--danger);font-size:12px">${ev.total_nc}✗</span></div>
-      </div></div>`).join('')||`<div class="es"><i class="ti ti-clipboard"></i>Sin inspecciones</div>`}`;
+    <!-- KPIs -->
+    <div class="sg" style="margin-bottom:.65rem">
+      <div class="sc"><div class="sv" style="color:var(--acc)">${todas.length}</div><div class="sl">Total</div></div>
+      <div class="sc"><div class="sv" style="color:var(--danger)">${conNC.length}</div><div class="sl">Con NC</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${hoyList.length}</div><div class="sl">Hoy</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc2)">${todas.reduce((a,i)=>a+(i.total_nc||0),0)}</div><div class="sl">NC Total</div></div>
+    </div>
+
+    <!-- FILTROS -->
+    <div style="display:flex;gap:.35rem;margin-bottom:.65rem">
+      <button class="btn bsm ${S.inspFiltro==='todas'?'bp':'bg'}" onclick="S.inspFiltro='todas';renderRole()">Todas (${todas.length})</button>
+      <button class="btn bsm ${S.inspFiltro==='nc'?'bp':'bg'}" onclick="S.inspFiltro='nc';renderRole()">Con NC (${conNC.length})</button>
+      <button class="btn bsm ${S.inspFiltro==='hoy'?'bp':'bg'}" onclick="S.inspFiltro='hoy';renderRole()">Hoy (${hoyList.length})</button>
+    </div>
+
+    <!-- LISTA -->
+    <div class="shd"><i class="ti ti-clipboard-check"></i> ${S.inspFiltro==='nc'?'Inspecciones con No Conformes':S.inspFiltro==='hoy'?'Inspecciones de hoy':'Todas las inspecciones'} (${lista.length})</div>
+    ${lista.slice(0,30).map(ev=>{
+      const eq=getEq(ev.equipo_cod);
+      return `<div class="card" style="cursor:pointer;margin-bottom:.45rem;border-color:${ev.total_nc>0?'rgba(239,68,68,.25)':'var(--border)'}" onclick="verInspeccion('${ev.id_inspeccion}')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="flex:1;min-width:0">
+            <div style="font-size:13px;font-weight:500">${eq.nombre}</div>
+            <div style="font-size:11px;color:var(--text2);margin-top:.15rem">${eq.codigo_interno} · ${eq.sucursal}</div>
+            <div style="font-size:11px;color:var(--text3);margin-top:.15rem">${ev.tipo_inspeccion} · ${ev.inspector}</div>
+            <div style="font-size:10px;color:var(--text3);font-family:var(--fm)">${fmtDT(ev.fecha_inspeccion)}</div>
+          </div>
+          <div style="text-align:right;flex-shrink:0;margin-left:.5rem">
+            <div>
+              <span style="color:var(--acc3);font-size:14px;font-weight:700">${ev.total_conformes}</span>
+              <span style="color:var(--text3);font-size:11px">✓</span>
+            </div>
+            ${ev.total_nc>0?`<div>
+              <span style="color:var(--danger);font-size:14px;font-weight:700">${ev.total_nc}</span>
+              <span style="color:var(--text3);font-size:11px">✗ NC</span>
+            </div>`:``}
+            ${ev.total_na>0?`<div style="font-size:11px;color:#94a3b8">${ev.total_na} N/A</div>`:''}
+            <div style="font-size:10px;color:var(--acc2);margin-top:.25rem">Ver detalle →</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')||`<div class="es"><i class="ti ti-clipboard"></i>Sin inspecciones</div>`}
+    ${lista.length>30?`<div style="text-align:center;font-size:11px;color:var(--text2);padding:.5rem">Mostrando 30 de ${lista.length}</div>`:''}`;
 }
 
 // ===================== MODAL OUTSIDE CLICK =====================
