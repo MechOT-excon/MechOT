@@ -346,6 +346,49 @@ async function loadAllData(){
   // next OT number
   const nums=S.ots.map(o=>parseInt(o.id_ot.replace(/\D/g,''))||0);
   S.nextOTNum=nums.length?Math.max(...nums)+1:1;
+  // Revisar OTs pendientes sin avance / atrasadas
+  await checkOTAlerts();
+}
+
+// ===================== ALERTAS DE OTs PENDIENTES =====================
+// Una OT "en ejecución"/"en proceso" genera alerta si:
+//  - Está atrasada según su fecha programada + días estimados (horas_programadas/8, redondeado arriba)
+//  - O no tiene actividad (reporte de avance) en las últimas 24h
+async function checkOTAlerts(){
+  const hoy=new Date(); hoy.setHours(0,0,0,0);
+  const activas=S.ots.filter(o=>['en_ejecucion','en_proceso'].includes(o.estado));
+  if(!activas.length) return;
+
+  // Traer el último reporte de avance de cada OT activa en una sola consulta
+  let ultimos={};
+  try{
+    const ids=activas.map(o=>o.id_ot);
+    const reportes=await supa.get('reportes_avance',`ot_id=in.(${ids.join(',')})&select=ot_id,fecha_reporte&order=fecha_reporte.desc`);
+    reportes.forEach(r=>{ if(!ultimos[r.ot_id]) ultimos[r.ot_id]=r.fecha_reporte; });
+  }catch(e){ /* si falla, seguimos sin el dato */ }
+
+  const ahora=new Date();
+  activas.forEach(o=>{
+    const eq=getEq(o.equipo_cod);
+    const diasEstimados=Math.max(1,Math.ceil((o.horas_programadas||1)/8));
+    const fechaInicio=new Date(o.fecha_programada+'T00:00:00');
+    const fechaLimite=new Date(fechaInicio); fechaLimite.setDate(fechaLimite.getDate()+(diasEstimados-1));
+    const atrasada=fechaLimite<hoy;
+
+    // Última actividad: último reporte, o si no hay, fecha de creación
+    const ultimaTs=ultimos[o.id_ot]||o.created_at;
+    let sinActividad=false;
+    if(ultimaTs){
+      const horasDesde=(ahora-new Date(ultimaTs))/(1000*60*60);
+      sinActividad=horasDesde>24;
+    }
+
+    if(atrasada){
+      addAlert('crit',`OT ${o.id_ot} atrasada`,`${eq.nombre} · ${o.nombre} · programada ${fmtDate(o.fecha_programada)} (${diasEstimados}d estimado)`);
+    } else if(sinActividad){
+      addAlert('warn',`OT ${o.id_ot} sin avance reciente`,`${eq.nombre} · ${o.nombre} · sin reportes en +24h`);
+    }
+  });
 }
 function showApp(){
   document.getElementById('login').classList.add('hidden');
@@ -603,11 +646,11 @@ function updCum(){
 
 // ===================== SUPERVISOR =====================
 function renderSup(){
-  const tabs=['Hoy','Semana','Compromisos','Inspecciones'];
+  const tabs=['Hoy','Semana','Compromisos','Calendario','Inspecciones'];
   document.getElementById('MC').innerHTML=`
     <div class="nt">${tabs.map((t,i)=>`<button class="ntb ${S.tab===i?'on':''}" onclick="setTab(${i})">${t}</button>`).join('')}</div>
     <div id="TC"></div>`;
-  [renderSupHoy,renderSupSemana,renderSupCompromisos,renderSupEval][S.tab](document.getElementById('TC'));
+  [renderSupHoy,renderSupSemana,renderSupCompromisos,renderCalendario,renderSupEval][S.tab](document.getElementById('TC'));
 }
 
 function renderSupHoy(tc){
@@ -1013,69 +1056,145 @@ async function generarPDF(id_ot, silent=false){
 }
 
 // ===================== INSPECCIONES =====================
+// Tipos de equipo con plantillas AT1
+const TIPOS_AT1 = ['Articulado Tolva','Bulldozer','Cargador Frontal','Excavadora','Motoniveladora'];
+
 function renderSupEval(tc){
   tc.innerHTML=`
-    <div class="shd"><i class="ti ti-clipboard-check"></i> Tipo de Inspección</div>
-    ${[{tipo:'Estándar',icon:'ti-list-check',desc:'Check general de seguridad'},
-       {tipo:'Mecánico',icon:'ti-engine',desc:'Inspección técnica por tipo de equipo'},
-       {tipo:'Neumáticos',icon:'ti-circle',desc:'Presión, desgaste y estado'}
-    ].map(x=>`<div class="card" style="cursor:pointer" onclick="openEvalSel('${x.tipo}')">
-      <div style="display:flex;align-items:center;gap:.65rem">
-        <div class="ri" style="width:36px;height:36px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:18px;color:var(--acc2)"><i class="ti ${x.icon}"></i></div>
-        <div><div class="ct">${x.tipo}</div><div class="cs">${x.desc}</div></div>
-        <i class="ti ti-chevron-right" style="color:var(--text3);margin-left:auto"></i>
-      </div></div>`).join('')}
-    <div class="shd"><i class="ti ti-history"></i> Recientes</div>
-    ${S.inspecciones.slice(0,5).map(ev=>`<div class="card">
+    <div class="shd"><i class="ti ti-clipboard-check"></i> Inspección AT1 — Tipo de Equipo</div>
+    ${TIPOS_AT1.map(tipo=>{
+      const count=S.plantillas.filter(p=>p.tipo_equipo===tipo).length;
+      return `<div class="card" style="cursor:pointer" onclick="openEvalSel('${tipo}')">
+        <div style="display:flex;align-items:center;gap:.65rem">
+          <div style="width:38px;height:38px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--acc2)">
+            <i class="ti ti-clipboard-list"></i></div>
+          <div><div class="ct">${tipo}</div><div class="cs">${count} ítems AT1</div></div>
+          <i class="ti ti-chevron-right" style="color:var(--text3);margin-left:auto"></i>
+        </div></div>`;
+    }).join('')}
+    <div class="shd"><i class="ti ti-history"></i> Inspecciones Recientes</div>
+    ${S.inspecciones.slice(0,5).map(ev=>`<div class="card" onclick="verInspeccion('${ev.id_inspeccion}')" style="cursor:pointer">
       <div class="chd">
-        <div><div class="ct" style="font-size:12px">${getEq(ev.equipo_cod).nombre}</div><div class="cs">${ev.tipo_inspeccion} · ${fmtDate(ev.fecha_inspeccion)}</div></div>
-        <div><span style="color:var(--acc3);font-size:12px">${ev.total_conformes}✓</span> <span style="color:var(--danger);font-size:12px">${ev.total_nc}✗</span></div>
+        <div><div class="ct" style="font-size:12px">${getEq(ev.equipo_cod).nombre}</div>
+          <div class="cs">${ev.tipo_inspeccion} · ${ev.inspector} · ${fmtDT(ev.fecha_inspeccion)}</div></div>
+        <div style="text-align:right">
+          <span style="color:var(--acc3);font-size:13px;font-weight:600">${ev.total_conformes}✓</span>
+          <span style="color:var(--danger);font-size:13px;font-weight:600;margin-left:.35rem">${ev.total_nc}✗</span>
+        </div>
       </div></div>`).join('')||`<div class="es" style="padding:1rem"><i class="ti ti-clipboard"></i>Sin inspecciones</div>`}`;
 }
 
-function openEvalSel(tipo){
-  const eqVis=visibleEquipos();
+function openEvalSel(tipoEq){
+  document.getElementById('m-eval-t').textContent=`AT1 — ${tipoEq}`;
   document.getElementById('m-eval-b').innerHTML=`
+    <div style="font-size:11px;color:var(--acc2);background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:.5rem .65rem;margin-bottom:.65rem">
+      <i class="ti ti-info-circle"></i> Formulario AT1 · ${S.plantillas.filter(p=>p.tipo_equipo===tipoEq).length} ítems
+    </div>
     <div class="fg"><label class="fl">Equipo a inspeccionar</label>
-      <select class="fs" id="ev-eq">${eqVis.map(e=>`<option value="${e.codigo_interno}" data-tipo="${e.tipo}">[${e.codigo_interno}] ${e.nombre}</option>`).join('')}</select></div>
-    <button class="btn bp bfull" onclick="startEval('${tipo}')"><i class="ti ti-clipboard-check"></i> Iniciar Inspección</button>`;
+      <select class="fs" id="ev-eq">
+        ${visibleEquipos().map(e=>`<option value="${e.codigo_interno}">[${e.codigo_interno}] ${e.nombre}</option>`).join('')}
+      </select></div>
+    <div class="fg"><label class="fl">Horómetro actual</label>
+      <input class="fi" id="ev-horometro" type="number" placeholder="Ej: 12450" style="font-family:var(--fm)"></div>
+    <button class="btn bp bfull" onclick="startEval('${tipoEq}')">
+      <i class="ti ti-clipboard-check"></i> Iniciar Inspección AT1</button>`;
   document.getElementById('m-eval').classList.remove('hidden');
 }
 
-function startEval(tipo){
-  const sel=document.getElementById('ev-eq');
-  const cod=sel.value; const tipoEq=sel.options[sel.selectedIndex].dataset.tipo||'Cargador';
-  const items=S.plantillas.filter(p=>p.tipo_inspeccion===tipo&&(p.tipo_equipo==='Todos'||p.tipo_equipo===tipoEq));
-  S.evalState={tipo,equipoCod:cod,tipoEq,items:items.map(p=>({name:p.item_inspeccion,estado:null,foto:null})),
-    fecha:new Date().toLocaleDateString('es-CL'),ts:new Date().toISOString()};
+function startEval(tipoEq){
+  const cod=document.getElementById('ev-eq').value;
+  const horometro=document.getElementById('ev-horometro').value||'';
+  const plantillas=S.plantillas.filter(p=>p.tipo_equipo===tipoEq&&p.tipo_inspeccion==='AT1');
+  if(!plantillas.length){alert(`No hay plantilla AT1 para "${tipoEq}".`);return;}
+  const secciones={};
+  plantillas.forEach(p=>{
+    const sec=p.seccion||'General';
+    if(!secciones[sec]) secciones[sec]=[];
+    secciones[sec].push({name:p.item_inspeccion,tipo_resp:p.tipo_respuesta||'BRM',estado:null,foto:null,obs:'',seccion:sec});
+  });
+  const items=[];
+  Object.entries(secciones).forEach(([sec,its])=>{
+    items.push({esSeccion:true,name:sec});
+    its.forEach(it=>items.push(it));
+  });
+  S.evalState={tipoEq,equipoCod:cod,horometro,items,ts:new Date().toISOString(),
+    totalItems:items.filter(i=>!i.esSeccion).length};
   renderEvalForm();
 }
 
 function renderEvalForm(){
   const st=S.evalState; const eq=getEq(st.equipoCod);
-  document.getElementById('m-eval-t').textContent=`${st.tipo} — ${eq.nombre}`;
+  const respondidos=st.items.filter(i=>!i.esSeccion&&i.estado).length;
+  const pct=Math.round(respondidos/st.totalItems*100);
+  const conf=st.items.filter(i=>!i.esSeccion&&['S','B'].includes(i.estado)).length;
+  const nc=st.items.filter(i=>!i.esSeccion&&['N','R','M'].includes(i.estado)).length;
+  const na=st.items.filter(i=>!i.esSeccion&&i.estado==='NA').length;
+  document.getElementById('m-eval-t').textContent=`AT1 ${eq.codigo_interno}`;
   document.getElementById('m-eval-b').innerHTML=`
-    <div style="font-size:12px;font-weight:500;color:var(--acc);margin-bottom:.5rem"><i class="ti ti-tractor"></i> ${eq.nombre} [${eq.codigo_interno}]</div>
-    <div style="display:flex;gap:.6rem;font-size:10px;color:var(--text2);margin-bottom:.65rem">
-      <span style="color:var(--acc3)">✓ Conforme</span><span style="color:var(--danger)">✗ No Conforme</span><span style="color:#94a3b8">N/A</span>
-    </div>
-    ${st.items.map((item,i)=>`<div class="ei" id="ei-${i}">
-      <div class="er"><span class="en">${item.name}</span>
-        <div class="eo">
-          <button class="eb ${item.estado==='ok'?'ok-on':''}" onclick="setEI(${i},'ok')">✓</button>
-          <button class="eb ${item.estado==='nc'?'nc-on':''}" onclick="setEI(${i},'nc')">✗</button>
-          <button class="eb ${item.estado==='na'?'na-on':''}" onclick="setEI(${i},'na')">N/A</button>
-        </div>
+    <div style="background:var(--bg3);border-radius:8px;padding:.55rem .65rem;margin-bottom:.65rem">
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:.3rem">
+        <span style="color:var(--text2)">${eq.nombre} · ${st.tipoEq}</span>
+        <span style="font-family:var(--fm);color:var(--acc)">${respondidos}/${st.totalItems}</span>
       </div>
-      ${item.estado==='nc'?`<div class="ncph ${item.foto?'up':''}" onclick="document.getElementById('ef-${i}').click()">
-        <input type="file" id="ef-${i}" accept="image/*" capture="environment" onchange="handleEF(${i},this)">
-        ${item.foto?`<i class="ti ti-photo-check"></i> Foto ✓`:`<i class="ti ti-camera"></i> Foto requerida`}</div>`:''}
-    </div>`).join('')}
+      ${pbw(pct)}
+      <div style="display:flex;gap:.5rem;margin-top:.3rem;font-size:10px">
+        <span style="color:var(--acc3)">${conf} conf.</span>
+        <span style="color:var(--danger)">${nc} NC</span>
+        <span style="color:#94a3b8">${na} N/A</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.65rem;font-size:10px">
+      <span style="background:rgba(16,185,129,.12);color:var(--acc3);padding:2px 7px;border-radius:5px;border:1px solid var(--acc3)">S=Sí</span>
+      <span style="background:rgba(239,68,68,.12);color:var(--danger);padding:2px 7px;border-radius:5px;border:1px solid var(--danger)">N=No</span>
+      <span style="background:rgba(59,130,246,.12);color:var(--acc2);padding:2px 7px;border-radius:5px;border:1px solid var(--acc2)">B=Bueno</span>
+      <span style="background:rgba(245,158,11,.12);color:var(--acc);padding:2px 7px;border-radius:5px;border:1px solid var(--acc)">R=Regular</span>
+      <span style="background:rgba(239,68,68,.12);color:var(--danger);padding:2px 7px;border-radius:5px;border:1px solid var(--danger)">M=Malo</span>
+      <span style="background:rgba(100,116,139,.12);color:#94a3b8;padding:2px 7px;border-radius:5px;border:1px solid #64748b">NA</span>
+    </div>
+    ${st.items.map((item,i)=>{
+      if(item.esSeccion) return `<div style="background:var(--bg3);border-left:3px solid var(--acc2);padding:.4rem .65rem;margin:.65rem 0 .35rem;border-radius:0 6px 6px 0">
+        <span style="font-size:11px;font-weight:600;color:var(--acc2);text-transform:uppercase;letter-spacing:.5px">${item.name}</span></div>`;
+      const isSN=item.tipo_resp==='SN';
+      const isNC=['N','R','M'].includes(item.estado);
+      return `<div class="ei" id="ei-${i}" style="${isNC?'border-color:rgba(239,68,68,.3)':''}">
+        <div class="er">
+          <span class="en" style="font-size:11px">${item.name}</span>
+          <div class="eo" style="gap:2px">
+            ${isSN?`
+              <button class="eb ${item.estado==='S'?'ok-on':''}" onclick="setEI(${i},'S')">S</button>
+              <button class="eb ${item.estado==='N'?'nc-on':''}" onclick="setEI(${i},'N')">N</button>
+              <button class="eb ${item.estado==='NA'?'na-on':''}" onclick="setEI(${i},'NA')" style="font-size:9px">NA</button>
+            `:`
+              <button class="eb" onclick="setEI(${i},'B')" style="${item.estado==='B'?'background:rgba(59,130,246,.18);border-color:var(--acc2);color:var(--acc2)':''}">B</button>
+              <button class="eb" onclick="setEI(${i},'R')" style="${item.estado==='R'?'background:rgba(245,158,11,.18);border-color:var(--acc);color:var(--acc)':''}">R</button>
+              <button class="eb ${item.estado==='M'?'nc-on':''}" onclick="setEI(${i},'M')">M</button>
+              <button class="eb ${item.estado==='NA'?'na-on':''}" onclick="setEI(${i},'NA')" style="font-size:9px">NA</button>
+            `}
+          </div>
+        </div>
+        ${isNC?`<div style="margin-top:.35rem">
+          <input class="fi" placeholder="Observación requerida..." id="obs-${i}" value="${item.obs||''}"
+            oninput="S.evalState.items[${i}].obs=this.value" style="font-size:12px;margin-bottom:.25rem">
+          <div class="ncph ${item.foto?'up':''}" onclick="document.getElementById('ef-${i}').click()">
+            <input type="file" id="ef-${i}" accept="image/*" capture="environment" onchange="handleEF(${i},this)">
+            ${item.foto?`<i class="ti ti-photo-check"></i> Foto ✓`:`<i class="ti ti-camera"></i> Foto requerida`}
+          </div></div>`:''}
+      </div>`;
+    }).join('')}
     <div class="div"></div>
-    <button class="btn bw bfull" onclick="saveEval()"><i class="ti ti-device-floppy"></i> Guardar Inspección</button>`;
+    <div style="font-size:11px;color:var(--text2);margin-bottom:.5rem;text-align:center">
+      ${respondidos}/${st.totalItems} respondidos${respondidos<st.totalItems?` · <span style="color:var(--warn)">Faltan ${st.totalItems-respondidos}</span>`:''}
+    </div>
+    <button class="btn bw bfull" onclick="saveEval()" ${respondidos===0?'disabled':''}>
+      <i class="ti ti-device-floppy"></i> Guardar Inspección AT1</button>`;
 }
 
-function setEI(i,v){S.evalState.items[i].estado=v;if(v!=='nc')S.evalState.items[i].foto=null;renderEvalForm();}
+function setEI(i,v){
+  S.evalState.items[i].estado=v;
+  if(!['N','R','M'].includes(v)){S.evalState.items[i].foto=null;S.evalState.items[i].obs='';}
+  renderEvalForm();
+  setTimeout(()=>{const el=document.getElementById(`ei-${i}`);if(el)el.scrollIntoView({block:'nearest'});},50);
+}
 function handleEF(i,inp){
   if(!inp.files||!inp.files[0]) return;
   const r=new FileReader();
@@ -1085,38 +1204,75 @@ function handleEF(i,inp){
 
 async function saveEval(){
   const st=S.evalState; const eq=getEq(st.equipoCod);
-  const ncs=st.items.filter(i=>i.estado==='nc');
+  const realItems=st.items.filter(i=>!i.esSeccion);
+  const ncs=realItems.filter(i=>['N','R','M'].includes(i.estado));
+  const sinObs=ncs.filter(i=>!i.obs||i.obs.trim()==='');
+  if(sinObs.length){alert(`Falta observación en:\n${sinObs.map(i=>`• ${i.name}`).join('\n')}`);return;}
   const sinFoto=ncs.filter(i=>!i.foto);
-  if(sinFoto.length){alert('Falta foto en: '+sinFoto.map(i=>i.name).join(', '));return;}
+  if(sinFoto.length){alert(`Falta foto en:\n${sinFoto.map(i=>`• ${i.name}`).join('\n')}`);return;}
   const idInsp='INSP-'+Date.now();
-  // subir fotos NC
   for(const item of ncs){
     if(item.foto){
       try{
         const blob=await(await fetch(item.foto)).blob();
         const file=new File([blob],'nc.jpg',{type:'image/jpeg'});
-        const path=`${eq.codigo_interno}/inspecciones/${idInsp}_${item.name.replace(/\s+/g,'_')}.jpg`;
+        const path=`${eq.codigo_interno}/inspecciones/${idInsp}_${item.name.replace(/\s+/g,'_').substring(0,30)}.jpg`;
         item.foto_url=await supa.upload(path,file);
       }catch(e){console.warn(e);}
     }
   }
+  const conformes=realItems.filter(i=>['S','B'].includes(i.estado)).length;
   const insp={
-    id_inspeccion:idInsp,equipo_cod:st.equipoCod,
-    sucursal:eq.sucursal||S.userSitio,
-    tipo_inspeccion:st.tipo,inspector:S.userName,
-    total_conformes:st.items.filter(i=>i.estado==='ok').length,
-    total_nc:ncs.length,
-    total_na:st.items.filter(i=>i.estado==='na').length,
-    items_json:JSON.stringify(st.items.map(i=>({nombre:i.name,estado:i.estado,foto_url:i.foto_url||null}))),
-    fotos_nc_json:JSON.stringify(ncs.map(i=>({item:i.name,url:i.foto_url||null})))
+    id_inspeccion:idInsp,equipo_cod:st.equipoCod,sucursal:eq.sucursal||S.userSitio,
+    tipo_inspeccion:`AT1 ${st.tipoEq}`,inspector:S.userName,
+    total_conformes:conformes,total_nc:ncs.length,
+    total_na:realItems.filter(i=>i.estado==='NA').length,
+    items_json:JSON.stringify(realItems.map(i=>({seccion:i.seccion,nombre:i.name,tipo_resp:i.tipo_resp,estado:i.estado,obs:i.obs||'',foto_url:i.foto_url||null}))),
+    fotos_nc_json:JSON.stringify(ncs.map(i=>({item:i.name,url:i.foto_url||null,obs:i.obs||''})))
   };
   try{
     const res=await supa.post('inspecciones',insp);
     S.inspecciones.unshift(res[0]);
-    if(ncs.length>0) addAlert('crit',`Inspección ${eq.nombre}`,`${ncs.length} no conforme(s) detectados`);
+    if(ncs.length>0) addAlert('crit',`AT1 ${eq.nombre}`,`${ncs.length} no conforme(s)`);
     cm('m-eval'); renderRole();
-    alert(`✓ Inspección guardada\n${insp.total_conformes} conformes · ${insp.total_nc} no conformes`);
+    alert(`✓ AT1 guardada\n✓ ${conformes} conformes · ✗ ${ncs.length} NC · ${insp.total_na} N/A`);
   }catch(e){alert('Error: '+e.message);}
+}
+
+async function verInspeccion(id){
+  const insp=S.inspecciones.find(i=>i.id_inspeccion===id);
+  if(!insp) return;
+  const eq=getEq(insp.equipo_cod);
+  const items=JSON.parse(insp.items_json||'[]');
+  const ncs=items.filter(i=>['N','R','M'].includes(i.estado));
+  document.getElementById('m-det-t').textContent=insp.tipo_inspeccion;
+  document.getElementById('m-det-b').innerHTML=`
+    <div style="margin-bottom:.65rem">
+      <div style="font-weight:500">${eq.nombre} <span class="tag-tipo">${eq.codigo_interno}</span></div>
+      <div style="font-size:11px;color:var(--text2);margin-top:.2rem">Inspector: ${insp.inspector} · ${fmtDT(insp.fecha_inspeccion)}</div>
+    </div>
+    <div class="sg" style="margin-bottom:.65rem">
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${insp.total_conformes}</div><div class="sl">Conformes</div></div>
+      <div class="sc"><div class="sv" style="color:var(--danger)">${insp.total_nc}</div><div class="sl">No Conformes</div></div>
+      <div class="sc"><div class="sv" style="color:#94a3b8">${insp.total_na}</div><div class="sl">N/A</div></div>
+    </div>
+    ${ncs.length?`<div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> No Conformes</div>
+    ${ncs.map(i=>`<div class="card" style="border-color:rgba(239,68,68,.3);margin-bottom:.4rem">
+      <div style="font-size:12px;font-weight:500">${i.nombre}</div>
+      <div style="font-size:10px;color:var(--text3)">${i.seccion||''}</div>
+      <span class="badge b-pau" style="margin-top:.2rem">${i.estado}</span>
+      ${i.obs?`<div style="font-size:11px;color:var(--text2);margin-top:.2rem">${i.obs}</div>`:''}
+      ${i.foto_url?`<a href="${i.foto_url}" target="_blank" style="font-size:11px;color:var(--acc2);display:block;margin-top:.25rem"><i class="ti ti-photo"></i> Ver foto</a>`:''}
+    </div>`).join('')}`:''}
+    <div class="shd">Todos los ítems</div>
+    ${[...new Set(items.map(i=>i.seccion))].filter(Boolean).map(sec=>`
+      <div style="font-size:10px;font-weight:600;color:var(--acc2);margin:.5rem 0 .2rem;text-transform:uppercase">${sec}</div>
+      ${items.filter(i=>i.seccion===sec).map(i=>`
+        <div style="display:flex;justify-content:space-between;font-size:11px;padding:.2rem 0;border-bottom:1px solid var(--border)">
+          <span style="color:${['N','R','M'].includes(i.estado)?'var(--danger)':i.estado==='NA'?'#94a3b8':'var(--text)'}">${i.nombre}</span>
+          <span style="font-family:var(--fm);font-size:10px;font-weight:600;color:${['N','R','M'].includes(i.estado)?'var(--danger)':['S','B'].includes(i.estado)?'var(--acc3)':'#94a3b8'}">${i.estado||'—'}</span>
+        </div>`).join('')}`).join('')}`;
+  document.getElementById('m-det').classList.remove('hidden');
 }
 
 // ===================== COMPROMISOS =====================
@@ -1153,7 +1309,7 @@ async function markEntregado(id_com){
 
 // ===================== JEFE =====================
 function renderJefe(){
-  const tabs=['Dashboard','OTs','Equipos','Compromisos','Cumplimiento'];
+  const tabs=['Dashboard','OTs','Equipos','Compromisos','Calendario','Cumplimiento'];
   document.getElementById('MC').innerHTML=`
     <div class="nt">${tabs.map((t,i)=>`<button class="ntb ${S.tab===i?'on':''}" onclick="setTab(${i})">${t}</button>`).join('')}</div>
     ${S.tab<=2?`<div style="display:flex;gap:.3rem;margin-bottom:.65rem;overflow-x:auto">
@@ -1164,7 +1320,7 @@ function renderJefe(){
       </button>`).join('')}
     </div>`:''}
     <div id="TC"></div>`;
-  [renderJefeDash,()=>document.getElementById('TC').innerHTML=otList(visibleOTs(),'openPlanDet'),renderEquipos,renderCompromisos,renderCumplimiento][S.tab](document.getElementById('TC'));
+  [renderJefeDash,()=>document.getElementById('TC').innerHTML=otList(visibleOTs(),'openPlanDet'),renderEquipos,renderCompromisos,renderCalendario,renderCumplimiento][S.tab](document.getElementById('TC'));
 }
 
 // ── Estado equipo helpers ──
@@ -1248,28 +1404,72 @@ function renderJefeDash(tc){
       </div>
     </div>
 
-    <!-- POR SUCURSAL -->
-    <div class="shd"><i class="ti ti-building"></i> Por Sucursal</div>
-    ${eqPorSuc.filter(s=>s.total>0).map(s=>`
-    <div class="card" style="margin-bottom:.5rem">
-      <div class="ct" style="margin-bottom:.5rem">${s.s}</div>
-      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.4rem">
-        <div class="sc" style="flex:1;min-width:60px;padding:.5rem"><div class="sv" style="font-size:16px;color:var(--acc)">${s.total}</div><div class="sl">Total</div></div>
-        <div class="sc" style="flex:1;min-width:60px;padding:.5rem"><div class="sv" style="font-size:16px;color:var(--acc2)">${s.enProceso}</div><div class="sl">En Proceso</div></div>
-        <div class="sc" style="flex:1;min-width:60px;padding:.5rem"><div class="sv" style="font-size:16px;color:var(--acc3)">${s.disponible}</div><div class="sl">Disponibles</div></div>
-        <div class="sc" style="flex:1;min-width:60px;padding:.5rem"><div class="sv" style="font-size:16px;color:var(--danger)">${s.atrasados}</div><div class="sl">Atrasados</div></div>
+
+    <!-- POR ÁREA → POR SUCURSAL -->
+    ${areaActual==='todos'?`
+    ${AREAS.map(a=>{
+      const eqArea=S.equipos.filter(e=>e.area===a);
+      if(!eqArea.length) return '';
+      const comsArea=S.compromisos.filter(c=>{
+        if(c.estado==='Entregado') return false;
+        const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
+        return eq&&eq.area===a;
+      });
+      return `<div class="card" style="border-color:${AREA_CFG[a]?.col};margin-bottom:.65rem">
+        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
+          <i class="ti ${AREA_CFG[a]?.icon}" style="color:${AREA_CFG[a]?.col};font-size:16px"></i>
+          <span style="font-weight:600;font-size:14px;color:${AREA_CFG[a]?.col}">${a}</span>
+          <span style="font-size:11px;color:var(--text2);margin-left:auto">${eqArea.length} equipos · ${comsArea.filter(c=>c.fecha_limite<hoy).length} atrasados</span>
+        </div>
+        ${['Lo Pinto','La Negra'].map(suc=>{
+          const eqSA=eqArea.filter(e=>e.sucursal===suc);
+          if(!eqSA.length) return '';
+          const comsSA=comsArea.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.sucursal===suc;});
+          const atSA=comsSA.filter(c=>c.fecha_limite<hoy).length;
+          const semSA=comsSA.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length;
+          const enPSA=eqSA.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso').length;
+          const dispSA=eqSA.filter(e=>e.estado_equipo==='Disponible').length;
+          return `<div style="background:var(--bg3);border-radius:8px;padding:.55rem .65rem;margin-bottom:.4rem">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+              <span style="font-size:12px;font-weight:500">${suc}</span>
+              <span style="font-size:11px;color:var(--text2);font-family:var(--fm)">${eqSA.length} equipos</span>
+            </div>
+            <div style="display:flex;gap:.3rem;flex-wrap:wrap">
+              <div style="flex:1;min-width:50px;background:var(--bg2);border-radius:6px;padding:.3rem;text-align:center">
+                <div style="font-size:14px;font-weight:600;color:var(--acc2);font-family:var(--fm)">${enPSA}</div>
+                <div style="font-size:8px;color:var(--text3);text-transform:uppercase">En Proceso</div>
+              </div>
+              <div style="flex:1;min-width:50px;background:var(--bg2);border-radius:6px;padding:.3rem;text-align:center">
+                <div style="font-size:14px;font-weight:600;color:var(--acc3);font-family:var(--fm)">${dispSA}</div>
+                <div style="font-size:8px;color:var(--text3);text-transform:uppercase">Disponibles</div>
+              </div>
+              <div style="flex:1;min-width:50px;background:var(--bg2);border-radius:6px;padding:.3rem;text-align:center">
+                <div style="font-size:14px;font-weight:600;color:var(--danger);font-family:var(--fm)">${atSA}</div>
+                <div style="font-size:8px;color:var(--text3);text-transform:uppercase">Atrasados</div>
+              </div>
+              <div style="flex:1;min-width:50px;background:var(--bg2);border-radius:6px;padding:.3rem;text-align:center">
+                <div style="font-size:14px;font-weight:600;color:var(--acc);font-family:var(--fm)">${semSA}</div>
+                <div style="font-size:8px;color:var(--text3);text-transform:uppercase">Esta semana</div>
+              </div>
+            </div>
+          </div>`;
+        }).join('')}
+      </div>`;
+    }).join('')}`
+    /* Si hay filtro de área activo — solo muestra por sucursal */
+    :`<div class="shd"><i class="ti ti-building"></i> Por Sucursal — ${areaActual}</div>
+    ${eqPorSuc.filter(s=>s.total>0).map(s=>`<div class="card" style="margin-bottom:.5rem">
+      <div class="ct" style="margin-bottom:.4rem">${s.s}</div>
+      <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.35rem">
+        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc)">${s.total}</div><div class="sl">Total</div></div>
+        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc2)">${s.enProceso}</div><div class="sl">En Proceso</div></div>
+        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc3)">${s.disponible}</div><div class="sl">Disponibles</div></div>
+        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--danger)">${s.atrasados}</div><div class="sl">Atrasados</div></div>
       </div>
       <div style="display:flex;gap:.4rem">
-        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.4rem;text-align:center">
-          <div style="font-size:14px;font-weight:600;color:var(--acc);font-family:var(--fm)">${s.semana}</div>
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase">Esta semana</div>
-        </div>
-        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.4rem;text-align:center">
-          <div style="font-size:14px;font-weight:600;color:var(--acc2);font-family:var(--fm)">${s.proxSemana}</div>
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase">Próx. semana</div>
-        </div>
-      </div>
-    </div>`).join('')}
+        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.35rem;text-align:center"><div style="font-size:13px;font-weight:600;color:var(--acc);font-family:var(--fm)">${s.semana}</div><div style="font-size:9px;color:var(--text2);text-transform:uppercase">Esta semana</div></div>
+        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.35rem;text-align:center"><div style="font-size:13px;font-weight:600;color:var(--acc2);font-family:var(--fm)">${s.proxSemana}</div><div style="font-size:9px;color:var(--text2);text-transform:uppercase">Próx. semana</div></div>
+      </div></div>`).join('')}`}
 
     <!-- ATRASADOS POR MES -->
     ${comsAtras.length?`
@@ -1420,27 +1620,33 @@ function openEqDetail(cod){
       </div>
     </div>`:''}
 
-    <!-- ESTADO Y ÁREA — solo Admin puede cambiar -->
-    ${S.role==='admin'?`<div class="card" style="margin-bottom:.65rem">
-      <div class="ct" style="margin-bottom:.5rem"><i class="ti ti-settings" style="color:var(--acc4)"></i> Configuración del Equipo</div>
+    <!-- ESTADO Y ÁREA -->
+    ${['admin','jefe','supervisor'].includes(S.role)?`<div class="card" style="margin-bottom:.65rem">
+      <div class="ct" style="margin-bottom:.5rem"><i class="ti ti-settings" style="color:var(--acc4)"></i> ${S.role==='admin'?'Configuración del Equipo':'Estado del Equipo'}</div>
       <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.3rem">Estado</div>
-      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.65rem">
-        ${['En Proceso','Disponible','Entregado'].map(s=>`
-          <button class="btn bsm ${est===s?'bs':''}" style="${est===s?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
-            onclick="cambiarEstadoEquipo('${cod}','${s}')">
-            ${s==='En Proceso'?'<i class="ti ti-tool"></i>':s==='Disponible'?'<i class="ti ti-circle-check"></i>':'<i class="ti ti-truck"></i>'}
-            ${s}
-          </button>`).join('')}
+      ${est!=='Disponible'&&activas.filter(o=>!['finalizada'].includes(o.estado)).length>0&&'Disponible'!==est?
+        `<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:.5rem .65rem;margin-bottom:.5rem;font-size:11px;color:var(--acc)">
+          <i class="ti ti-alert-triangle"></i> Para marcar como <b>Disponible</b> debes cerrar primero las ${activas.filter(o=>!['finalizada'].includes(o.estado)).length} OT(s) activa(s)
+        </div>`:``}
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:${S.role==='admin'?'.65rem':'.2rem'}">
+        <button class="btn bsm ${est==='En Proceso'?'bs':''}" style="${est==='En Proceso'?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
+          onclick="cambiarEstadoEquipo('${cod}','En Proceso')"><i class="ti ti-tool"></i> En Proceso</button>
+        <button class="btn bsm ${est==='Disponible'?'bs':''}"
+          style="${est==='Disponible'?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
+          onclick="intentarDisponible('${cod}')"
+          ${activas.filter(o=>!['finalizada'].includes(o.estado)).length>0&&est!=='Disponible'?'disabled':''}>
+          <i class="ti ti-circle-check"></i> Disponible
+        </button>
+        ${S.role==='admin'?`<button class="btn bsm ${est==='Entregado'?'bs':''}" style="${est==='Entregado'?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
+          onclick="cambiarEstadoEquipo('${cod}','Entregado')"><i class="ti ti-truck"></i> Entregado</button>`:''}
       </div>
-      <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.3rem">Área</div>
+      ${est==='Disponible'?`<div style="margin-top:.4rem;font-size:11px;color:var(--acc3);background:rgba(16,185,129,.08);border-radius:6px;padding:.4rem .6rem"><i class="ti ti-info-circle"></i> Equipo listo para entrega — pendiente despacho</div>`:''}
+      ${S.role==='admin'?`
+      <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-top:.65rem;margin-bottom:.3rem">Área</div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap">
-        ${AREAS.map(a=>`
-          <button class="btn bsm" style="${(e.area||'Habilitación')===a?`background:${AREA_CFG[a]?.bg};color:${AREA_CFG[a]?.col};border:1px solid ${AREA_CFG[a]?.col}`:'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
-            onclick="cambiarAreaEquipo('${cod}','${a}')">
-            <i class="ti ${AREA_CFG[a]?.icon}"></i> ${a}
-          </button>`).join('')}
-      </div>
-      ${est==='Disponible'?`<div style="margin-top:.5rem;font-size:11px;color:var(--acc3);background:rgba(16,185,129,.08);border-radius:6px;padding:.4rem .6rem"><i class="ti ti-info-circle"></i> Equipo listo para entrega — pendiente despacho</div>`:''}
+        ${AREAS.map(a=>`<button class="btn bsm" style="${(e.area||'Habilitación')===a?`background:${AREA_CFG[a]?.bg};color:${AREA_CFG[a]?.col};border:1px solid ${AREA_CFG[a]?.col}`:'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
+          onclick="cambiarAreaEquipo('${cod}','${a}')"><i class="ti ${AREA_CFG[a]?.icon}"></i> ${a}</button>`).join('')}
+      </div>`:''}
     </div>`:''}
 
     <div class="sg">
@@ -1477,6 +1683,127 @@ async function cambiarEstadoEquipo(cod, nuevoEstado){
   }catch(e){alert('Error: '+e.message);}
 }
 
+async function intentarDisponible(cod){
+  const eots=S.ots.filter(o=>o.equipo_cod===cod);
+  const abiertas=eots.filter(o=>!['finalizada'].includes(o.estado));
+  if(abiertas.length>0){
+    alert(`⚠ No se puede marcar como Disponible.\n\nHay ${abiertas.length} OT(s) abiertas:\n${abiertas.map(o=>`• ${o.id_ot} — ${o.nombre} (${EC[o.estado]?.lbl||o.estado})`).join('\n')}\n\nCierra o finaliza estas OTs primero.`);
+    return;
+  }
+  await cambiarEstadoEquipo(cod,'Disponible');
+}
+
+// ===================== CALENDARIO DE COMPROMISOS =====================
+function renderCalendario(tc){
+  const hoy=today();
+  const esSuper=S.role==='supervisor';
+  const meses=esSuper?1:2; // supervisor ve ~3 semanas (1 mes), resto 2 meses
+  const coms=visibleCompromisos().filter(c=>c.estado!=='Entregado');
+
+  // Agrupar compromisos por fecha
+  const porFecha={};
+  coms.forEach(c=>{
+    if(!c.fecha_limite) return;
+    if(!porFecha[c.fecha_limite]) porFecha[c.fecha_limite]=[];
+    porFecha[c.fecha_limite].push(c);
+  });
+
+  let html='<div id="cal-sel" style="display:none"></div>';
+
+  // Generar meses
+  const ahora=new Date(hoy+'T12:00:00');
+  for(let m=0;m<meses;m++){
+    const mesDate=new Date(ahora.getFullYear(), ahora.getMonth()+m, 1);
+    const mesNom=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][mesDate.getMonth()];
+    const anio=mesDate.getFullYear();
+    const diasMes=new Date(anio,mesDate.getMonth()+1,0).getDate();
+    const primerDia=(mesDate.getDay()+6)%7; // 0=Lunes
+
+    html+=`<div class="card" style="margin-bottom:.65rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem">
+        <div style="font-weight:600;font-size:14px">${mesNom} ${anio}</div>
+        <div style="font-size:11px;color:var(--text2)">${coms.filter(c=>c.fecha_limite&&c.fecha_limite.startsWith(`${anio}-${String(mesDate.getMonth()+1).padStart(2,'0')}`)).length} compromisos</div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:.3rem">
+        ${['L','M','X','J','V','S','D'].map(d=>`<div style="text-align:center;font-size:9px;color:var(--text3);font-weight:600;padding:.2rem 0">${d}</div>`).join('')}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+        ${Array(primerDia).fill('<div></div>').join('')}
+        ${Array.from({length:diasMes},(_,i)=>{
+          const d=i+1;
+          const fecha=`${anio}-${String(mesDate.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+          const comsDia=porFecha[fecha]||[];
+          const esHoy=fecha===hoy;
+          const esPasado=fecha<hoy;
+          const vencidos=comsDia.filter(c=>esPasado).length;
+          let bg='transparent', col=esPasado?'var(--text3)':'var(--text)', border='transparent';
+          if(esHoy){bg='var(--acc2)';col='#fff';border='var(--acc2)';}
+          else if(comsDia.length>0){
+            if(esPasado){bg='rgba(239,68,68,.15)';col='var(--danger)';border='rgba(239,68,68,.3)';}
+            else if(comsDia.length>=3){bg='rgba(245,158,11,.15)';col='var(--acc)';border='rgba(245,158,11,.3)';}
+            else{bg='rgba(16,185,129,.12)';col='var(--acc3)';border='rgba(16,185,129,.3)';}
+          }
+          return `<div onclick="verDiaCompromisos('${fecha}')" style="text-align:center;padding:.3rem .1rem;border-radius:6px;cursor:${comsDia.length>0?'pointer':'default'};background:${bg};border:1px solid ${border}">
+            <div style="font-size:12px;font-weight:${esHoy||comsDia.length?'600':'400'};color:${col}">${d}</div>
+            ${comsDia.length?`<div style="font-size:8px;color:${col};font-family:var(--fm)">${comsDia.length}</div>`:''}
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  }
+
+  // Próximas entregas como lista
+  const proximas=coms.filter(c=>c.fecha_limite>=hoy).sort((a,b)=>a.fecha_limite.localeCompare(b.fecha_limite)).slice(0,10);
+  const atrasadas=coms.filter(c=>c.fecha_limite<hoy).sort((a,b)=>b.fecha_limite.localeCompare(a.fecha_limite));
+
+  html+=`${atrasadas.length?`<div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Atrasados (${atrasadas.length})</div>
+    ${atrasadas.map(c=>{
+      const eq=getEq(c.equipo_cod);
+      const diff=Math.abs(Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)));
+      return `<div class="card" style="border-color:rgba(239,68,68,.3);margin-bottom:.4rem;padding:.6rem .75rem">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:12px;font-weight:500">${eq.nombre}</div>
+            <div style="font-size:10px;color:var(--text2)">${c.destino_envio}</div></div>
+          <div style="text-align:right"><div style="font-size:11px;color:var(--danger);font-weight:600">${diff}d atraso</div>
+            <div style="font-size:10px;color:var(--text3);font-family:var(--fm)">${fmtDate(c.fecha_limite)}</div></div>
+        </div></div>`;
+    }).join('')}`:''}
+  ${proximas.length?`<div class="shd"><i class="ti ti-calendar-event" style="color:var(--acc2)"></i> Próximas entregas</div>
+    ${proximas.map(c=>{
+      const eq=getEq(c.equipo_cod);
+      const diff=Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000));
+      const col=diff<=3?'var(--acc)':diff<=7?'var(--acc2)':'var(--acc3)';
+      return `<div class="card" style="margin-bottom:.4rem;padding:.6rem .75rem">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div style="font-size:12px;font-weight:500">${eq.nombre}</div>
+            <div style="font-size:10px;color:var(--text2)">${c.destino_envio}</div></div>
+          <div style="text-align:right"><div style="font-size:11px;color:${col};font-weight:600">${diff===0?'HOY':diff+'d'}</div>
+            <div style="font-size:10px;color:var(--text3);font-family:var(--fm)">${fmtDate(c.fecha_limite)}</div></div>
+        </div></div>`;
+    }).join('')}`:''}`;
+
+  tc.innerHTML=html;
+}
+
+function verDiaCompromisos(fecha){
+  const coms=visibleCompromisos().filter(c=>c.fecha_limite===fecha&&c.estado!=='Entregado');
+  if(!coms.length) return;
+  const hoy=today();
+  const esPasado=fecha<hoy;
+  document.getElementById('m-com-t').textContent=`Compromisos ${fmtDate(fecha)}`;
+  document.getElementById('m-com-b').innerHTML=coms.map(c=>{
+    const eq=getEq(c.equipo_cod);
+    return `<div class="card" style="border-color:${esPasado?'rgba(239,68,68,.3)':'rgba(59,130,246,.25)'};margin-bottom:.5rem">
+      <div style="font-weight:500;font-size:13px">${eq.nombre}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:.2rem">${eq.codigo_interno} · ${eq.sucursal}</div>
+      <div style="font-size:12px;margin-top:.35rem"><i class="ti ti-flag" style="color:var(--acc)"></i> ${c.objetivo}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:.15rem"><i class="ti ti-map-pin"></i> ${c.destino_envio}</div>
+      ${eqEstadoBadge(eq.estado_equipo)} ${areaBadge(eq.area)}
+    </div>`;
+  }).join('');
+  document.getElementById('m-com').classList.remove('hidden');
+}
+
 async function cambiarAreaEquipo(cod, nuevaArea){
   try{
     await supa.patch('equipos',`codigo_interno=eq.${cod}`,{area:nuevaArea});
@@ -1506,7 +1833,7 @@ function renderCompromisos(tc){
 
 // ===================== ADMIN =====================
 function renderAdmin(){
-  const tabs=['KPIs','Usuarios','Equipos','Compromisos','Inspecciones'];
+  const tabs=['KPIs','Usuarios','Equipos','Compromisos','Calendario','Inspecciones'];
   document.getElementById('MC').innerHTML=`
     <div class="nt">${tabs.map((t,i)=>`<button class="ntb ${S.tab===i?'on':''}" onclick="setTab(${i})">${t}</button>`).join('')}</div>
     ${S.tab===0||S.tab===2?`<div style="display:flex;gap:.3rem;margin-bottom:.65rem;overflow-x:auto">
@@ -1517,7 +1844,7 @@ function renderAdmin(){
       </button>`).join('')}
     </div>`:''}
     <div id="TC"></div>`;
-  [renderAdminKPIs,renderAdminUsuarios,renderEquipos,renderCompromisos,renderAdminInspecciones][S.tab](document.getElementById('TC'));
+  [renderAdminKPIs,renderAdminUsuarios,renderEquipos,renderCompromisos,renderCalendario,renderAdminInspecciones][S.tab](document.getElementById('TC'));
 }
 
 function renderAdminKPIs(tc){
