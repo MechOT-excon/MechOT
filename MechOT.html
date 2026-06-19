@@ -1212,6 +1212,7 @@ async function saveEval(){
   const sinFoto=ncs.filter(i=>!i.foto);
   if(sinFoto.length){alert(`Falta foto en:\n${sinFoto.map(i=>`• ${i.name}`).join('\n')}`);return;}
   const idInsp='INSP-'+Date.now();
+  // Subir fotos NC
   for(const item of ncs){
     if(item.foto){
       try{
@@ -1223,7 +1224,7 @@ async function saveEval(){
     }
   }
   const conformes=realItems.filter(i=>['S','B'].includes(i.estado)).length;
-  const insp={
+  const inspData={
     id_inspeccion:idInsp,equipo_cod:st.equipoCod,sucursal:eq.sucursal||S.userSitio,
     tipo_inspeccion:`AT1 ${st.tipoEq}`,inspector:S.userName,
     total_conformes:conformes,total_nc:ncs.length,
@@ -1232,12 +1233,141 @@ async function saveEval(){
     fotos_nc_json:JSON.stringify(ncs.map(i=>({item:i.name,url:i.foto_url||null,obs:i.obs||''})))
   };
   try{
-    const res=await supa.post('inspecciones',insp);
+    const res=await supa.post('inspecciones',inspData);
     S.inspecciones.unshift(res[0]);
     if(ncs.length>0) addAlert('crit',`AT1 ${eq.nombre}`,`${ncs.length} no conforme(s)`);
+    // Generar y subir PDF
+    await generarPDFInspeccion(idInsp, eq, st, realItems, ncs, inspData);
     cm('m-eval'); renderRole();
-    alert(`✓ AT1 guardada\n✓ ${conformes} conformes · ✗ ${ncs.length} NC · ${insp.total_na} N/A`);
+    alert(`✓ AT1 guardada y PDF generado\n✓ ${conformes} conformes · ✗ ${ncs.length} NC · ${inspData.total_na} N/A`);
   }catch(e){alert('Error: '+e.message);}
+}
+
+async function generarPDFInspeccion(idInsp, eq, st, realItems, ncs, inspData){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210; const M=15;
+  let y=M;
+  const hoy=new Date().toLocaleString('es-CL');
+
+  // ── Header ──
+  doc.setFillColor(30,36,56); doc.rect(0,0,W,32,'F');
+  doc.setTextColor(255,255,255);
+  doc.setFontSize(18); doc.setFont(undefined,'bold');
+  doc.text('MechOT',M,13);
+  doc.setFontSize(11); doc.setFont(undefined,'normal');
+  doc.text('Informe de Inspección Técnica AT1',M,22);
+  doc.setFontSize(9);
+  doc.text(`Generado: ${hoy}`,W-M,22,{align:'right'});
+  y=40;
+
+  // ── Info equipo ──
+  doc.setFillColor(245,246,250); doc.rect(M,y-4,W-M*2,28,'F');
+  doc.setTextColor(30,36,56); doc.setFontSize(14); doc.setFont(undefined,'bold');
+  doc.text(`${eq.nombre}`,M+3,y+4);
+  doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(80,80,80);
+  doc.text(`Código: ${eq.codigo_interno}  ·  Tipo: ${st.tipoEq}  ·  Sucursal: ${eq.sucursal}`,M+3,y+11);
+  doc.text(`Marca: ${eq.marca||'—'}  ·  Modelo: ${eq.modelo||'—'}`,M+3,y+17);
+  doc.text(`Inspector: ${inspData.inspector}  ·  Fecha: ${hoy}  ·  ID: ${idInsp}`,M+3,y+23);
+  y+=36;
+
+  // ── Resumen ──
+  const conformes=realItems.filter(i=>['S','B'].includes(i.estado)).length;
+  const pctConf=realItems.length?Math.round(conformes/realItems.length*100):0;
+  doc.setFillColor(22,27,39); doc.rect(M,y,W-M*2,16,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont(undefined,'bold');
+  doc.text(`Resumen: ${conformes} Conformes  ·  ${ncs.length} No Conformes  ·  ${inspData.total_na} N/A  ·  ${pctConf}% de cumplimiento`,M+3,y+6);
+  // Barra progreso
+  doc.setFillColor(42,48,72); doc.rect(M,y+9,W-M*2,4,'F');
+  doc.setFillColor(16,185,129); doc.rect(M,y+9,(W-M*2)*pctConf/100,4,'F');
+  y+=26;
+
+  // ── NO CONFORMES (primero) ──
+  if(ncs.length>0){
+    doc.setTextColor(192,0,0); doc.setFontSize(12); doc.setFont(undefined,'bold');
+    doc.text(`No Conformes (${ncs.length})`,M,y); y+=6;
+    for(const item of ncs){
+      if(y>260){doc.addPage();y=M;}
+      doc.setFillColor(255,231,231); doc.rect(M,y-3,W-M*2,20,'F');
+      doc.setDrawColor(192,0,0); doc.rect(M,y-3,W-M*2,20,'S');
+      doc.setTextColor(192,0,0); doc.setFontSize(10); doc.setFont(undefined,'bold');
+      doc.text(`[${item.estado}] ${item.name}`,M+2,y+3);
+      doc.setTextColor(80,80,80); doc.setFont(undefined,'normal'); doc.setFontSize(9);
+      if(item.seccion) doc.text(`Sección: ${item.seccion}`,M+2,y+8);
+      if(item.obs) doc.text(`Observación: ${item.obs}`,M+2,y+13);
+      if(item.foto_url){
+        doc.setTextColor(59,130,246);
+        doc.text(`Foto: ${item.foto_url}`,M+2,y+18);
+      }
+      y+=24;
+    }
+    y+=4;
+  }
+
+  // ── TODOS LOS ÍTEMS agrupados por sección ──
+  const secciones=[...new Set(realItems.map(i=>i.seccion||'General'))];
+  doc.setTextColor(30,36,56); doc.setFontSize(12); doc.setFont(undefined,'bold');
+  doc.text('Detalle Completo de Inspección',M,y); y+=7;
+
+  for(const sec of secciones){
+    if(y>270){doc.addPage();y=M;}
+    // Encabezado sección
+    doc.setFillColor(46,117,182); doc.rect(M,y-3,W-M*2,8,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont(undefined,'bold');
+    doc.text(sec.toUpperCase(),M+2,y+1);
+    y+=9;
+
+    const secItems=realItems.filter(i=>(i.seccion||'General')===sec);
+    for(const item of secItems){
+      if(y>275){doc.addPage();y=M;}
+      const isNC=['N','R','M'].includes(item.estado);
+      const isOK=['S','B'].includes(item.estado);
+      // Color fondo según resultado
+      if(isNC){doc.setFillColor(255,231,231);}
+      else if(isOK){doc.setFillColor(226,239,218);}
+      else{doc.setFillColor(242,242,242);}
+      doc.rect(M,y-1,W-M*2,7,'F');
+      // Texto ítem
+      doc.setTextColor(isNC?192:isOK?55:100, isNC?0:isOK?86:100, isNC?0:isOK?35:100);
+      doc.setFontSize(8); doc.setFont(undefined,isNC?'bold':'normal');
+      const nombreCorto=item.name.length>70?item.name.substring(0,67)+'...':item.name;
+      doc.text(nombreCorto,M+2,y+3);
+      // Estado alineado a la derecha
+      doc.setFont(undefined,'bold');
+      const estadoTxt=item.estado||'—';
+      doc.text(estadoTxt,W-M-3,y+3,{align:'right'});
+      // Observación si NC
+      if(isNC&&item.obs){
+        y+=7;
+        if(y>275){doc.addPage();y=M;}
+        doc.setFillColor(255,240,240); doc.rect(M+4,y-1,W-M*2-4,5,'F');
+        doc.setTextColor(150,0,0); doc.setFont(undefined,'italic'); doc.setFontSize(7);
+        const obsCorta=item.obs.length>90?item.obs.substring(0,87)+'...':item.obs;
+        doc.text(`  → ${obsCorta}`,M+4,y+2);
+      }
+      y+=7;
+    }
+    y+=3;
+  }
+
+  // ── Footer ──
+  const pageCount=doc.internal.getNumberOfPages();
+  for(let p=1;p<=pageCount;p++){
+    doc.setPage(p);
+    doc.setFillColor(30,36,56); doc.rect(0,285,W,12,'F');
+    doc.setTextColor(150,150,180); doc.setFontSize(7); doc.setFont(undefined,'normal');
+    doc.text(`MechOT · ${idInsp} · ${eq.nombre} · ${eq.codigo_interno}`,M,292);
+    doc.text(`Pág. ${p}/${pageCount}`,W-M,292,{align:'right'});
+  }
+
+  // Subir PDF a Supabase Storage
+  try{
+    const pdfBlob=doc.output('blob');
+    const pdfFile=new File([pdfBlob],'inspeccion.pdf',{type:'application/pdf'});
+    const fechaStr=new Date().toISOString().split('T')[0];
+    const pdfPath=`${eq.codigo_interno}/inspecciones/${idInsp}_AT1_${st.tipoEq.replace(/\s+/g,'_')}_${fechaStr}.pdf`;
+    await supa.upload(pdfPath, pdfFile);
+  }catch(e){console.warn('Error subiendo PDF inspección:',e);}
 }
 
 async function verInspeccion(id){
@@ -1245,34 +1375,66 @@ async function verInspeccion(id){
   if(!insp) return;
   const eq=getEq(insp.equipo_cod);
   const items=JSON.parse(insp.items_json||'[]');
-  const ncs=items.filter(i=>['N','R','M'].includes(i.estado));
+  const fotos=JSON.parse(insp.fotos_nc_json||'[]');
+
+  // Compatibilidad con formato antiguo (ok/nc/na) y nuevo (S/N/B/R/M/NA)
+  const isNC=i=>['N','R','M','nc'].includes(i.estado);
+  const isOK=i=>['S','B','ok'].includes(i.estado);
+  const ncs=items.filter(i=>isNC(i));
+  const hasSecciones=[...new Set(items.map(i=>i.seccion))].filter(Boolean).length>0;
+
   document.getElementById('m-det-t').textContent=insp.tipo_inspeccion;
   document.getElementById('m-det-b').innerHTML=`
     <div style="margin-bottom:.65rem">
       <div style="font-weight:500">${eq.nombre} <span class="tag-tipo">${eq.codigo_interno}</span></div>
       <div style="font-size:11px;color:var(--text2);margin-top:.2rem">Inspector: ${insp.inspector} · ${fmtDT(insp.fecha_inspeccion)}</div>
+      <div style="font-size:11px;color:var(--text2)">${eq.sucursal}</div>
     </div>
+
     <div class="sg" style="margin-bottom:.65rem">
       <div class="sc"><div class="sv" style="color:var(--acc3)">${insp.total_conformes}</div><div class="sl">Conformes</div></div>
       <div class="sc"><div class="sv" style="color:var(--danger)">${insp.total_nc}</div><div class="sl">No Conformes</div></div>
-      <div class="sc"><div class="sv" style="color:#94a3b8">${insp.total_na}</div><div class="sl">N/A</div></div>
+      <div class="sc"><div class="sv" style="color:#94a3b8">${insp.total_na||0}</div><div class="sl">N/A</div></div>
     </div>
-    ${ncs.length?`<div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> No Conformes</div>
-    ${ncs.map(i=>`<div class="card" style="border-color:rgba(239,68,68,.3);margin-bottom:.4rem">
-      <div style="font-size:12px;font-weight:500">${i.nombre}</div>
-      <div style="font-size:10px;color:var(--text3)">${i.seccion||''}</div>
-      <span class="badge b-pau" style="margin-top:.2rem">${i.estado}</span>
-      ${i.obs?`<div style="font-size:11px;color:var(--text2);margin-top:.2rem">${i.obs}</div>`:''}
-      ${i.foto_url?`<a href="${i.foto_url}" target="_blank" style="font-size:11px;color:var(--acc2);display:block;margin-top:.25rem"><i class="ti ti-photo"></i> Ver foto</a>`:''}
-    </div>`).join('')}`:''}
+
+    ${ncs.length?`
+    <div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> No Conformes (${ncs.length})</div>
+    ${ncs.map(i=>{
+      // Buscar foto en fotos_nc_json o en foto_url del item
+      const fotoEntry=fotos.find(f=>f.item===i.nombre||f.item===i.name);
+      const fotoUrl=i.foto_url||fotoEntry?.url||null;
+      return `<div class="card" style="border-color:rgba(239,68,68,.3);margin-bottom:.4rem">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div style="flex:1">
+            <div style="font-size:12px;font-weight:500">${i.nombre||i.name}</div>
+            ${i.seccion?`<div style="font-size:10px;color:var(--text3);margin-top:.1rem">${i.seccion}</div>`:''}
+            <span class="badge b-pau" style="margin-top:.25rem">${i.estado}</span>
+            ${i.obs?`<div style="font-size:11px;color:var(--text2);margin-top:.3rem;background:var(--bg3);padding:.3rem .5rem;border-radius:6px">${i.obs}</div>`:''}
+          </div>
+          ${fotoUrl?`<a href="${fotoUrl}" target="_blank" style="margin-left:.5rem;flex-shrink:0">
+            <div style="width:56px;height:56px;border-radius:8px;background:var(--bg3);border:1px solid rgba(239,68,68,.3);display:flex;align-items:center;justify-content:center;color:var(--acc2)">
+              <i class="ti ti-photo" style="font-size:20px"></i>
+            </div>
+            <div style="font-size:9px;color:var(--acc2);text-align:center;margin-top:.2rem">Ver foto</div>
+          </a>`:''}
+        </div>
+      </div>`;
+    }).join('')}`:''}
+
     <div class="shd">Todos los ítems</div>
-    ${[...new Set(items.map(i=>i.seccion))].filter(Boolean).map(sec=>`
-      <div style="font-size:10px;font-weight:600;color:var(--acc2);margin:.5rem 0 .2rem;text-transform:uppercase">${sec}</div>
-      ${items.filter(i=>i.seccion===sec).map(i=>`
-        <div style="display:flex;justify-content:space-between;font-size:11px;padding:.2rem 0;border-bottom:1px solid var(--border)">
-          <span style="color:${['N','R','M'].includes(i.estado)?'var(--danger)':i.estado==='NA'?'#94a3b8':'var(--text)'}">${i.nombre}</span>
-          <span style="font-family:var(--fm);font-size:10px;font-weight:600;color:${['N','R','M'].includes(i.estado)?'var(--danger)':['S','B'].includes(i.estado)?'var(--acc3)':'#94a3b8'}">${i.estado||'—'}</span>
-        </div>`).join('')}`).join('')}`;
+    ${hasSecciones
+      ? [...new Set(items.map(i=>i.seccion))].filter(Boolean).map(sec=>`
+          <div style="font-size:10px;font-weight:600;color:var(--acc2);margin:.5rem 0 .2rem;text-transform:uppercase;letter-spacing:.4px">${sec}</div>
+          ${items.filter(i=>i.seccion===sec).map(i=>`
+            <div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0;border-bottom:1px solid var(--border)">
+              <span style="color:${isNC(i)?'var(--danger)':i.estado==='NA'||i.estado==='na'?'#94a3b8':'var(--text)'}">${i.nombre||i.name}</span>
+              <span style="font-family:var(--fm);font-size:10px;font-weight:600;color:${isNC(i)?'var(--danger)':isOK(i)?'var(--acc3)':'#94a3b8'}">${i.estado||'—'}</span>
+            </div>`).join('')}`).join('')
+      : items.map(i=>`
+          <div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0;border-bottom:1px solid var(--border)">
+            <span style="color:${isNC(i)?'var(--danger)':i.estado==='NA'||i.estado==='na'?'#94a3b8':'var(--text)'}">${i.nombre||i.name}</span>
+            <span style="font-family:var(--fm);font-size:10px;font-weight:600;color:${isNC(i)?'var(--danger)':isOK(i)?'var(--acc3)':'#94a3b8'}">${i.estado||'—'}</span>
+          </div>`).join('')}`;
   document.getElementById('m-det').classList.remove('hidden');
 }
 
