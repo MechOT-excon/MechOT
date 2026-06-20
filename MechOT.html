@@ -816,49 +816,51 @@ async function openSupOT(id_ot){
       ${pbw(avancePct)}
       <div style="margin-top:.5rem">
         ${tareas.map((t,i)=>`
-        <div style="background:${t.check?'rgba(16,185,129,.06)':'var(--bg3)'};border:1px solid ${t.check?'rgba(16,185,129,.2)':'var(--border)'};border-radius:8px;padding:.5rem .65rem;margin-bottom:.35rem">
-          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+        <div style="background:${t.check?'rgba(16,185,129,.06)':'var(--bg3)'};border:1px solid ${t.check?'rgba(16,185,129,.2)':'var(--border)'};border-radius:8px;padding:.5rem .65rem;margin-bottom:.35rem" id="tarea-card-${i}">
+          <!-- Nombre + checkbox -->
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.4rem">
             <div class="tkc ${t.check?'on':''}" onclick="togTask('${id_ot}',${i})" style="cursor:pointer;flex-shrink:0">
               ${t.check?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':''}
             </div>
             <span style="font-size:12px;flex:1;${t.check?'text-decoration:line-through;color:var(--text2)':''}">${t.nombre}</span>
+            <span style="font-size:10px;color:var(--text3);font-family:var(--fm)">${t.horas_prog||0}h prog</span>
           </div>
-          <div style="display:flex;align-items:center;gap:.5rem;padding-left:1.7rem;flex-wrap:wrap">
+          <!-- Horas reales -->
+          <div style="display:flex;align-items:center;gap:.5rem;padding-left:1.7rem;margin-bottom:.35rem">
             <i class="ti ti-clock" style="font-size:11px;color:var(--text3)"></i>
-            <span style="font-size:10px;color:var(--text3)">${t.horas_prog||0}h prog.</span>
             <input type="number" min="0" step="0.5" value="${t.horas||0}"
               onchange="actualizarHorasTarea('${id_ot}',${i},this.value)"
-              style="width:60px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:2px 6px;color:var(--text);font-size:12px;font-family:var(--fm)">
-            <span style="font-size:10px;color:var(--text3)">h reales</span>
-            <!-- Foto por tarea -->
-            <div onclick="document.getElementById('fi-tarea-${i}').click()"
-              style="display:flex;align-items:center;gap:.3rem;cursor:pointer;padding:3px 8px;border-radius:6px;border:1px solid ${t.fotoPendiente?'rgba(16,185,129,.4)':'var(--border)'};background:${t.fotoPendiente?'rgba(16,185,129,.08)':'var(--bg2)'}">
-              <input type="file" id="fi-tarea-${i}" accept="image/*" capture="environment" onchange="handleFotoTarea(${i},this)" style="display:none">
-              <i class="ti ti-${t.fotoPendiente?'photo-check':'camera'}" style="font-size:12px;color:${t.fotoPendiente?'var(--acc3)':'var(--text3)'}"></i>
-              <span style="font-size:10px;color:${t.fotoPendiente?'var(--acc3)':'var(--text3)'}">
-                ${t.fotoPendiente?'Foto lista':'Foto tarea'}
-              </span>
-            </div>
+              style="width:65px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);font-size:12px;font-family:var(--fm)">
+            <span style="font-size:10px;color:var(--text3)">horas reales</span>
+          </div>
+          <!-- Foto tarea — sube inmediatamente -->
+          <div style="padding-left:1.7rem">
+            ${t.foto_url_subida?
+              `<div style="display:flex;align-items:center;gap:.4rem;font-size:11px;color:var(--acc3)">
+                <i class="ti ti-photo-check"></i> Foto subida ✓
+                <a href="${t.foto_url_subida}" target="_blank" style="color:var(--acc2);font-size:10px">ver</a>
+              </div>`:
+              `<div style="position:relative;display:inline-flex;align-items:center;gap:.3rem;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer" id="btn-ft-${i}">
+                <input type="file" accept="image/*" capture="environment"
+                  onchange="subirFotoTareaInmediato('${id_ot}',${i},this)"
+                  style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer">
+                <i class="ti ti-camera" style="font-size:12px;color:var(--text3)"></i>
+                <span style="font-size:10px;color:var(--text3)">Foto (opcional)</span>
+              </div>`
+            }
+            <div id="upload-status-${i}" style="font-size:10px;color:var(--acc);margin-top:.2rem"></div>
           </div>
         </div>`).join('')}
       </div>
 
-      <!-- NOTAS Y FOTO DEL REPORTE -->
+      <!-- NOTAS DEL REPORTE -->
       <div class="div"></div>
       <div class="fg">
         <label class="fl">Notas del reporte (opcional)</label>
         <textarea class="fta" id="nv" style="min-height:45px" placeholder="Observaciones del avance..."></textarea>
       </div>
-      <div class="fg">
-        <label class="fl">Foto de avance (opcional)</label>
-        <div class="pu" id="pu-av" onclick="document.getElementById('fi-av').click()">
-          <input type="file" id="fi-av" accept="image/*" capture="environment" onchange="handleFotoAvance(this)">
-          <i class="ti ti-camera" id="pu-av-icon"></i>
-          <div class="pu-txt" id="pu-av-txt">Toca para capturar foto</div>
-        </div>
-      </div>
       <button class="btn bw bfull" onclick="saveAvance('${id_ot}')">
-        <i class="ti ti-device-floppy"></i> Guardar Reporte de Avance
+        <i class="ti ti-device-floppy"></i> Guardar Reporte
       </button>
     </div>
 
@@ -920,33 +922,47 @@ async function actualizarHorasTarea(id_ot, idx, valor){
   await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,horas_ejecutadas:horasEjecutadas,avance_pct:avance});
 }
 
-// Foto avance general (opcional)
+// Foto avance general — ya no se usa, mantener por compatibilidad
 let _fotoAvanceFile=null;
 function handleFotoAvance(inp){
   if(!inp.files||!inp.files[0]) return;
   _fotoAvanceFile=inp.files[0];
-  document.getElementById('pu-av').classList.add('ok');
-  document.getElementById('pu-av-icon').className='ti ti-photo-check';
-  document.getElementById('pu-av-txt').textContent='Foto lista ✓';
 }
 
-// Foto por tarea específica
-let _fotosTareas={};
-function handleFotoTarea(idx, inp){
+// Fotos por tarea — URLs ya subidas inmediatamente
+let _fotosTareasURL={};
+let _fotosTareas={}; // mantener por compatibilidad
+
+// Sube la foto de una tarea INMEDIATAMENTE al seleccionarla
+async function subirFotoTareaInmediato(id_ot, idx, inp){
   if(!inp.files||!inp.files[0]) return;
-  _fotosTareas[String(idx)]=inp.files[0];
-  // Feedback visual simple sin búsqueda DOM compleja
+  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
+  const statusEl=document.getElementById(`upload-status-${idx}`);
+  const btnEl=document.getElementById(`btn-ft-${idx}`);
+  if(statusEl) statusEl.textContent='⏳ Subiendo...';
   try{
-    inp.style.display='none';
-    const parent=inp.parentElement;
-    if(parent){
-      parent.style.borderColor='rgba(16,185,129,.4)';
-      parent.style.background='rgba(16,185,129,.08)';
-      parent.innerHTML=`<i class="ti ti-photo-check" style="font-size:12px;color:var(--acc3)"></i>
-        <span style="font-size:10px;color:var(--acc3)">✓</span>`;
+    const comp=await comprimirImagen(inp.files[0]);
+    const ts=new Date().toISOString().replace(/[:.]/g,'-');
+    const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/tarea${idx}_${ts}.jpg`;
+    const url=await uploadConReintento(path,comp);
+    _fotosTareasURL[String(idx)]=url;
+    if(btnEl){
+      btnEl.innerHTML=`<i class="ti ti-photo-check" style="font-size:12px;color:var(--acc3)"></i>
+        <span style="font-size:10px;color:var(--acc3)">Foto ✓</span>
+        <a href="${url}" target="_blank" style="font-size:10px;color:var(--acc2);margin-left:.3rem">ver</a>`;
+      btnEl.style.borderColor='rgba(16,185,129,.4)';
+      btnEl.style.background='rgba(16,185,129,.08)';
     }
-  }catch(e){}
+    if(statusEl) statusEl.textContent='';
+  }catch(e){
+    if(statusEl) statusEl.textContent='⚠ Error, intenta de nuevo';
+    addAlert('warn',`Foto tarea ${idx+1} — OT ${id_ot}`,'No se pudo subir.');
+  }
 }
+
+// Mantener handleFotoTarea por si acaso
+function handleFotoTarea(idx,inp){subirFotoTareaInmediato(document.querySelector('[id^="tarea-card-"]')?.id?.split('-')[2]||'',idx,inp);}
+
 
 async function handleFotoCierre(id_ot,inp){
   if(!inp.files||!inp.files[0]) return;
@@ -977,50 +993,22 @@ async function saveAvance(id_ot){
   const avance=o.horas_programadas?Math.min(100,Math.round(horasProgCompletadas/o.horas_programadas*100)):0;
   const notas=document.getElementById('nv')?.value||'';
 
-  // Capturar y limpiar _fotosTareas antes de subir (evitar condiciones de carrera)
-  const fotasParaSubir={...(_fotosTareas)};
-  _fotosTareas={};
+  // Capturar fotos ya subidas y limpiar
+  const fotosTareasSubidas={..._fotosTareasURL};
+  _fotosTareasURL={};
 
-  // Subir fotos por tarea (comprimir en el momento de subir)
-  const fotosPorTarea={};
-  for(const [idx,file] of Object.entries(fotasParaSubir)){
-    if(!file) continue;
-    const ts=new Date().toISOString().replace(/[:.]/g,'-');
-    const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/tarea${idx}_${ts}.jpg`;
-    try{
-      const comp=await comprimirImagen(file);
-      fotosPorTarea[idx]=await uploadConReintento(path,comp);
-      console.log(`Foto tarea ${idx} subida: ${fotosPorTarea[idx]}`);
-    }catch(e){
-      addAlert('warn',`Foto tarea ${parseInt(idx)+1} — OT ${id_ot}`,'No se pudo subir. Intenta de nuevo.');
-    }
-  }
-
-  // Subir foto general si hay
-  let fotoUrl=null;
-  if(_fotoAvanceFile){
-    const ts=new Date().toISOString().replace(/[:.]/g,'-');
-    const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/avance_${ts}.jpg`;
-    try{
-      const fileComp=await comprimirImagen(_fotoAvanceFile);
-      fotoUrl=await uploadConReintento(path,fileComp);
-    }catch(e){
-      addAlert('warn',`Foto general — OT ${id_ot}`,'No se pudo subir la foto general.');
-    }
-    _fotoAvanceFile=null;
-  }
-
-  // Guardar reporte con fotos por tarea
+  // Las fotos ya fueron subidas — solo asignar URLs
   const tareasConFoto=tareas.map((t,i)=>({
     nombre:t.nombre, check:t.check,
-    horas:t.horas||0, tecnico:o.tecnico, fecha:today(),
-    foto_tarea_url:fotosPorTarea[String(i)]||null
+    horas:t.horas||0, horas_prog:t.horas_prog||0,
+    tecnico:o.tecnico, fecha:today(),
+    foto_tarea_url:fotosTareasSubidas[String(i)]||null
   }));
 
   const reporte={
     ot_id:id_ot, equipo_cod:o.equipo_cod,
     avance_pct:avance, horas_ejecutadas:horasEjecutadas,
-    notas, foto_url:fotoUrl,
+    notas, foto_url:null,
     supervisor:S.userName,
     tareas_json:JSON.stringify(tareasConFoto)
   };
@@ -1046,13 +1034,20 @@ async function togTask(id_ot,idx){
   const o=S.ots.find(x=>x.id_ot===id_ot);
   const tareas=JSON.parse(o.tareas_json||'[]');
   tareas[idx].check=!tareas[idx].check;
-  // Si no hay horas_prog, distribuir horas programadas equitativamente
   const horasPorTarea=o.horas_programadas/tareas.length;
   const horasProgCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||horasPorTarea),0);
   const avance=o.horas_programadas?Math.min(100,Math.round(horasProgCompletadas/o.horas_programadas*100)):0;
   o.tareas_json=JSON.stringify(tareas); o.avance_pct=avance;
   await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,avance_pct:avance});
-  openSupOT(id_ot);
+  // Actualizar solo el checkbox visualmente sin re-renderizar
+  const tkcs=document.querySelectorAll('.tkc');
+  if(tkcs[idx]){
+    const checked=tareas[idx].check;
+    tkcs[idx].classList.toggle('on',checked);
+    tkcs[idx].innerHTML=checked?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':'';
+    const span=tkcs[idx].closest('div[style]')?.querySelector('span');
+    if(span) span.style.textDecoration=checked?'line-through':'none';
+  }
 }
 
 function openPausa(id_ot){
@@ -2243,147 +2238,232 @@ function renderJefeDash(tc){
   const {lunStr,domStr}=getWeekRange();
   const {nextLunStr,nextDomStr}=getNextWeekRange();
   const atras=ots.filter(o=>o.estado!=='finalizada'&&o.fecha_programada<hoy);
-  const comVenc=visibleCompromisos().filter(c=>c.estado!=='Entregado'&&c.fecha_limite<hoy);
 
-  // ── Equipos KPIs ──
+  function dashKPIs(eqList, comList){
+    const proceso=eqList.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso').length;
+    const disp=eqList.filter(e=>e.estado_equipo==='Disponible').length;
+    const ruta=eqList.filter(e=>e.estado_equipo==='En Ruta').length;
+    // Atrasados = En Proceso con fecha vencida
+    const atrasados=comList.filter(c=>{
+      if(c.estado==='Entregado') return false;
+      const eq=getEq(c.equipo_cod);
+      return c.fecha_limite<hoy&&(eq?.estado_equipo||'En Proceso')==='En Proceso';
+    }).length;
+    // Entregados esta semana = fecha_entrega_real dentro de la semana
+    const entSemana=comList.filter(c=>c.estado==='Entregado'&&c.fecha_entrega_real>=lunStr&&c.fecha_entrega_real<=domStr).length;
+    // Otros estados de compromisos esta semana
+    const comsSem=comList.filter(c=>c.estado!=='Entregado');
+    const rutaSem=comsSem.filter(c=>{const eq=getEq(c.equipo_cod);return eq?.estado_equipo==='En Ruta'&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;}).length;
+    const dispSem=comsSem.filter(c=>{const eq=getEq(c.equipo_cod);return eq?.estado_equipo==='Disponible'&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;}).length;
+    const pendSem=comsSem.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length;
+    const metaSem=entSemana+rutaSem+dispSem+pendSem;
+    const pctSem=metaSem?Math.min(100,Math.round(entSemana/metaSem*100)):0;
+    const proxSem=comsSem.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr).length;
+    return {proceso,disp,ruta,atrasados,entSemana,rutaSem,dispSem,pendSem,metaSem,pctSem,proxSem};
+  }
+
   const eqVis=visibleEquipos();
-  const eqEnProceso=eqVis.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso');
-  const eqDisponible=eqVis.filter(e=>e.estado_equipo==='Disponible');
-  const coms=visibleCompromisos().filter(c=>c.estado!=='Entregado');
-  const comsAtras=coms.filter(c=>c.fecha_limite<hoy);
-  const comsSemana=coms.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr);
-  const comsProxSemana=coms.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr);
+  const comsVis=visibleCompromisos();
+  const kTodos=dashKPIs(eqVis,comsVis);
 
-  // Atrasados por mes
-  const atrasosPorMes={};
-  comsAtras.forEach(c=>{
-    const mes=c.fecha_limite?c.fecha_limite.substring(0,7):'Sin fecha';
-    if(!atrasosPorMes[mes]) atrasosPorMes[mes]=[];
-    atrasosPorMes[mes].push(c);
+  // Por área
+  const areaData={};
+  AREAS.forEach(a=>{
+    const eqA=S.equipos.filter(e=>e.area===a&&(S.role==='admin'||e.sucursal===S.userSitio));
+    const comA=S.compromisos.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.area===a&&(S.role==='admin'||eq.sucursal===S.userSitio);});
+    areaData[a]=dashKPIs(eqA,comA);
+    areaData[a].total=eqA.length;
   });
 
-  // Por sucursal
-  const sucursales=['Lo Pinto','La Negra'];
-  const eqPorSuc=sucursales.map(s=>({
-    s,
-    total:eqVis.filter(e=>e.sucursal===s).length,
-    enProceso:eqVis.filter(e=>e.sucursal===s&&(e.estado_equipo||'En Proceso')==='En Proceso').length,
-    disponible:eqVis.filter(e=>e.sucursal===s&&e.estado_equipo==='Disponible').length,
-    atrasados:coms.filter(c=>c.sucursal===s&&c.fecha_limite<hoy).length,
-    semana:coms.filter(c=>c.sucursal===s&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length,
-    proxSemana:coms.filter(c=>c.sucursal===s&&c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr).length,
-  }));
+  // Por sitio
+  const sitios=['Lo Pinto','La Negra'];
+  const sitioData=sitios.map(s=>{
+    const eqS=eqVis.filter(e=>e.sucursal===s);
+    const comS=comsVis.filter(c=>{const eq=getEq(c.equipo_cod);return eq?.sucursal===s;});
+    const k=dashKPIs(eqS,comS);
+    return {...k,nombre:s,total:eqS.length};
+  });
+
+  function kpiBlocks(k){
+    return `
+      <!-- Fila 1: En Proceso + Atrasados -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="border:1.5px solid var(--acc2);border-radius:10px;padding:10px 12px">
+          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-tool"></i> En Proceso</div>
+          <div style="font-size:28px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
+        </div>
+        <div style="border:1.5px solid var(--danger);border-radius:10px;padding:10px 12px;background:rgba(239,68,68,.05)">
+          <div style="font-size:10px;font-weight:500;color:var(--danger);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-alert-triangle"></i> Atrasados</div>
+          <div style="font-size:28px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.atrasados}</div>
+        </div>
+      </div>
+      <!-- Fila 2: Disponibles + En Ruta + Entregados semana -->
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="border:1.5px solid var(--acc3);border-radius:10px;padding:10px 10px">
+          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-circle-check"></i> Disponibles</div>
+          <div style="font-size:24px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
+        </div>
+        <div style="border:1.5px solid #ef9f27;border-radius:10px;padding:10px 10px">
+          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-truck"></i> En Ruta</div>
+          <div style="font-size:24px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
+        </div>
+        <div style="border:1.5px solid #7f77dd;border-radius:10px;padding:10px 10px">
+          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-flag"></i> Entregados sem.</div>
+          <div style="font-size:24px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
+        </div>
+      </div>
+      <!-- Fila 3: Compromisos esta semana + próxima -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px">
+          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-calendar-week"></i> Esta semana</div>
+          <div style="font-size:24px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.metaSem}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">compromisos</div>
+        </div>
+        <div style="border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px">
+          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-calendar"></i> Próxima semana</div>
+          <div style="font-size:24px;font-weight:500;color:var(--text2);font-family:var(--fm)">${k.proxSem}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">compromisos</div>
+        </div>
+      </div>`;
+  }
+
+  function semanaBlock(k){
+    const max=k.metaSem||1;
+    const barEnt=Math.round(k.entSemana/max*100);
+    const barRut=Math.round(k.rutaSem/max*100);
+    const barDis=Math.round(k.dispSem/max*100);
+    const barPen=Math.round(k.pendSem/max*100);
+    return `<div style="border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+        <span style="font-size:12px;font-weight:500;color:var(--text)">Meta semanal: <strong>${k.metaSem}</strong> equipos</span>
+        <span style="font-size:13px;font-weight:500;color:var(--acc3)">${k.pctSem}%</span>
+      </div>
+      <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${k.entSemana} de ${k.metaSem} entregados</div>
+      ${pbw(k.pctSem)}
+      <div style="border-top:1px dashed var(--border);margin:10px 0 7px"></div>
+      <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">¿Cómo vamos?</div>
+      ${[
+        {lbl:'Entregados',n:k.entSemana,pct:barEnt,col:'#7f77dd'},
+        {lbl:'En Ruta',n:k.rutaSem,pct:barRut,col:'#ef9f27'},
+        {lbl:'Disponibles',n:k.dispSem,pct:barDis,col:var_acc3()},
+        {lbl:'Pendientes',n:k.pendSem,pct:barPen,col:'var(--acc2)'},
+      ].map(r=>`<div style="display:flex;align-items:center;gap:7px;padding:3px 0">
+        <div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:${r.col}"></div>
+        <span style="font-size:12px;flex:1;color:var(--text)">${r.lbl}</span>
+        <div style="flex:0 0 70px;background:var(--bg3);border-radius:2px;height:5px;overflow:hidden">
+          <div style="height:100%;width:${r.pct}%;background:${r.col}"></div>
+        </div>
+        <span style="font-size:13px;font-weight:500;min-width:18px;text-align:right;color:${r.col}">${r.n}</span>
+      </div>`).join('')}
+    </div>
+    <div style="border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div>
+        <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Próxima semana</div>
+        <div style="font-size:12px;color:var(--text);margin-top:2px">Compromisos pendientes</div>
+      </div>
+      <div style="font-size:26px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proxSem}</div>
+    </div>`;
+  }
+
+  function var_acc3(){return '#1d9e75';}
+
+  function sitioBlocks(list){
+    return list.filter(s=>s.total>0).map(s=>`
+      <div style="border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:500;color:var(--text)">${s.nombre}</span>
+          <span style="font-size:11px;color:var(--text2)">${s.total} equipos</span>
+        </div>
+        <!-- Fila 1: En Proceso + Atrasados -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+          <div style="border:1px solid var(--acc2);border-radius:8px;padding:8px 10px">
+            <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-tool"></i> En Proceso</div>
+            <div style="font-size:22px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${s.proceso}</div>
+          </div>
+          <div style="border:1px solid var(--danger);border-radius:8px;padding:8px 10px;background:rgba(239,68,68,.04)">
+            <div style="font-size:9px;color:var(--danger);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-alert-triangle"></i> Atrasados</div>
+            <div style="font-size:22px;font-weight:500;color:var(--danger);font-family:var(--fm)">${s.atrasados}</div>
+          </div>
+        </div>
+        <!-- Fila 2: Disponibles + En Ruta + Entregados sem -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+          <div style="border:1px solid var(--acc3);border-radius:8px;padding:7px 8px">
+            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-circle-check"></i> Disponibles</div>
+            <div style="font-size:18px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${s.disp}</div>
+          </div>
+          <div style="border:1px solid #ef9f27;border-radius:8px;padding:7px 8px">
+            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-truck"></i> En Ruta</div>
+            <div style="font-size:18px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${s.ruta}</div>
+          </div>
+          <div style="border:1px solid #7f77dd;border-radius:8px;padding:7px 8px">
+            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-flag"></i> Entregados</div>
+            <div style="font-size:18px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${s.entSemana}</div>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
+  // Tabs de área
+  const areaTab=S.dashArea||'todos';
+  const eqBase=areaTab==='todos'?eqVis:S.equipos.filter(e=>e.area===areaTab&&(S.role==='admin'||e.sucursal===S.userSitio));
+  const comBase=areaTab==='todos'?comsVis:S.compromisos.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.area===areaTab&&(S.role==='admin'||eq.sucursal===S.userSitio);});
+  const kActual=areaTab==='todos'?kTodos:dashKPIs(eqBase,comBase);
+  const sitioActual=sitioData; // siempre muestra ambos sitios
 
   tc.innerHTML=`
-    <!-- KPIs EQUIPOS HABILITACIÓN -->
-    <div class="shd"><i class="ti ti-tractor"></i> Estado de Equipos en Habilitación</div>
-    <div class="sg">
-      <div class="sc"><div class="sv" style="color:var(--acc)">${eqVis.length}</div><div class="sl">Total Equipos</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc2)">${eqEnProceso.length}</div><div class="sl">En Proceso</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc3)">${eqDisponible.length}</div><div class="sl">Disponibles</div></div>
-      <div class="sc"><div class="sv" style="color:var(--danger)">${comsAtras.length}</div><div class="sl">Atrasados</div></div>
+    <!-- ÁREA TABS -->
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-layout-grid"></i> Ver por área</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      ${['todos',...AREAS].map(a=>`<div onclick="S.dashArea='${a}';renderRole()"
+        style="flex:1;padding:6px 4px;text-align:center;border:1.5px solid ${areaTab===a?'var(--acc2)':'var(--border)'};border-radius:8px;font-size:11px;cursor:pointer;color:${areaTab===a?'var(--acc2)':'var(--text2)'};background:${areaTab===a?'rgba(59,130,246,.08)':'var(--bg)'};font-weight:${areaTab===a?'500':'400'}">
+        ${a==='todos'?'Todos':a}
+      </div>`).join('')}
     </div>
 
-    <!-- ENTREGAS -->
-    <div class="sg">
-      <div class="sc" style="cursor:pointer" onclick="setTab(4);renderRole()">
-        <div class="sv" style="color:var(--acc)">${comsSemana.length}</div>
-        <div class="sl">Entregan esta semana</div>
-      </div>
-      <div class="sc">
-        <div class="sv" style="color:var(--acc2)">${comsProxSemana.length}</div>
-        <div class="sl">Entregan próx. semana</div>
-      </div>
+    <!-- KPIs ESTADO -->
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px">
+      <i class="ti ti-tool"></i> Estado actual${areaTab!=='todos'?' — '+areaTab:''}
     </div>
+    ${kpiBlocks(kActual)}
 
+    <!-- META SEMANAL -->
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-calendar-week"></i> Compromisos — esta semana</div>
+    ${semanaBlock(kActual)}
 
-    <!-- POR ÁREA → POR SUCURSAL -->
-    ${areaActual==='todos'?`
-    ${AREAS.map(a=>{
-      const eqArea=S.equipos.filter(e=>e.area===a);
-      if(!eqArea.length) return '';
-      const comsArea=S.compromisos.filter(c=>{
+    <!-- POR SITIO -->
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-map-pin"></i> Por sitio${areaTab!=='todos'?' — '+areaTab:''}</div>
+    ${sitioBlocks(sitioActual)}
+
+    <!-- ATRASADOS DETALLE -->
+    ${kActual.atrasados>0?`
+    <div style="font-size:10px;font-weight:500;color:var(--danger);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:rgba(239,68,68,.08);border-radius:8px;margin-bottom:8px"><i class="ti ti-alert-triangle"></i> Detalle de atrasados</div>
+    ${(()=>{
+      const atrasadosList=comBase.filter(c=>{
         if(c.estado==='Entregado') return false;
-        const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
-        return eq&&eq.area===a;
+        const eq=getEq(c.equipo_cod);
+        return c.fecha_limite<hoy&&(eq?.estado_equipo||'En Proceso')==='En Proceso';
       });
-      return `<div class="card" style="border-color:${AREA_CFG[a]?.col};margin-bottom:.65rem">
-        <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
-          <i class="ti ${AREA_CFG[a]?.icon}" style="color:${AREA_CFG[a]?.col};font-size:16px"></i>
-          <span style="font-weight:600;font-size:14px;color:${AREA_CFG[a]?.col}">${a}</span>
-          <span style="font-size:11px;color:var(--text2);margin-left:auto">${eqArea.length} equipos · ${comsArea.filter(c=>c.fecha_limite<hoy).length} atrasados</span>
-        </div>
-        ${['Lo Pinto','La Negra'].map(suc=>{
-          const eqSA=eqArea.filter(e=>e.sucursal===suc);
-          if(!eqSA.length) return '';
-          const comsSA=comsArea.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.sucursal===suc;});
-          const atSA=comsSA.filter(c=>c.fecha_limite<hoy).length;
-          const semSA=comsSA.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length;
-          const enPSA=eqSA.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso').length;
-          const dispSA=eqSA.filter(e=>e.estado_equipo==='Disponible').length;
-          return `<div style="background:var(--bg3);border-radius:8px;padding:.55rem .65rem;margin-bottom:.4rem">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-              <span style="font-size:12px;font-weight:500">${suc}</span>
-              <span style="font-size:11px;color:var(--text2);font-family:var(--fm)">${eqSA.length} equipos</span>
-            </div>
-            <div style="display:flex;gap:.3rem;flex-wrap:wrap">
-              <div style="flex:1;min-width:50px;background:var(--bg2);border-radius:6px;padding:.3rem;text-align:center">
-                <div style="font-size:14px;font-weight:600;color:var(--acc2);font-family:var(--fm)">${enPSA}</div>
-                <div style="font-size:8px;color:var(--text3);text-transform:uppercase">En Proceso</div>
-              </div>
-              <div style="flex:1;min-width:50px;background:var(--bg2);border-radius:6px;padding:.3rem;text-align:center">
-                <div style="font-size:14px;font-weight:600;color:var(--acc3);font-family:var(--fm)">${dispSA}</div>
-                <div style="font-size:8px;color:var(--text3);text-transform:uppercase">Disponibles</div>
-              </div>
-              <div style="flex:1;min-width:50px;background:var(--bg2);border-radius:6px;padding:.3rem;text-align:center">
-                <div style="font-size:14px;font-weight:600;color:var(--danger);font-family:var(--fm)">${atSA}</div>
-                <div style="font-size:8px;color:var(--text3);text-transform:uppercase">Atrasados</div>
-              </div>
-              <div style="flex:1;min-width:50px;background:var(--bg2);border-radius:6px;padding:.3rem;text-align:center">
-                <div style="font-size:14px;font-weight:600;color:var(--acc);font-family:var(--fm)">${semSA}</div>
-                <div style="font-size:8px;color:var(--text3);text-transform:uppercase">Esta semana</div>
-              </div>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>`;
-    }).join('')}`
-    /* Si hay filtro de área activo — solo muestra por sucursal */
-    :`<div class="shd"><i class="ti ti-building"></i> Por Sucursal — ${areaActual}</div>
-    ${eqPorSuc.filter(s=>s.total>0).map(s=>`<div class="card" style="margin-bottom:.5rem">
-      <div class="ct" style="margin-bottom:.4rem">${s.s}</div>
-      <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.35rem">
-        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc)">${s.total}</div><div class="sl">Total</div></div>
-        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc2)">${s.enProceso}</div><div class="sl">En Proceso</div></div>
-        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc3)">${s.disponible}</div><div class="sl">Disponibles</div></div>
-        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--danger)">${s.atrasados}</div><div class="sl">Atrasados</div></div>
-      </div>
-      <div style="display:flex;gap:.4rem">
-        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.35rem;text-align:center"><div style="font-size:13px;font-weight:600;color:var(--acc);font-family:var(--fm)">${s.semana}</div><div style="font-size:9px;color:var(--text2);text-transform:uppercase">Esta semana</div></div>
-        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.35rem;text-align:center"><div style="font-size:13px;font-weight:600;color:var(--acc2);font-family:var(--fm)">${s.proxSemana}</div><div style="font-size:9px;color:var(--text2);text-transform:uppercase">Próx. semana</div></div>
-      </div></div>`).join('')}`}
-
-    <!-- ATRASADOS POR MES -->
-    ${comsAtras.length?`
-    <div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Atrasados por Mes (${comsAtras.length})</div>
-    ${Object.entries(atrasosPorMes).sort().map(([mes,lista])=>{
-      const [anio,m]=mes.split('-');
-      const nomMes=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m)]||mes;
-      return `<div class="card" style="border-color:rgba(239,68,68,.25);margin-bottom:.45rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
-          <span style="font-weight:500;color:var(--danger)">${nomMes} ${anio}</span>
-          <span class="badge b-pau">${lista.length} equipo${lista.length>1?'s':''}</span>
-        </div>
-        ${lista.map(c=>{
-          const eq=getEq(c.equipo_cod);
-          const diffDias=Math.abs(Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)));
-          return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0;border-bottom:1px solid var(--border)">
-            <span>${eq.nombre} <span style="color:var(--text3)">[${eq.codigo_interno}]</span></span>
-            <span style="color:var(--danger)">${diffDias}d atraso · ${c.destino_envio}</span>
-          </div>`;
-        }).join('')}
-      </div>`;
-    }).join('')}`:''}
+      const porMes={};
+      atrasadosList.forEach(c=>{const m=c.fecha_limite?.substring(0,7)||'?';if(!porMes[m])porMes[m]=[];porMes[m].push(c);});
+      return Object.entries(porMes).sort().map(([mes,lista])=>{
+        const [a,m]=mes.split('-');
+        const nom=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m)]||mes;
+        return `<div class="card" style="border-color:rgba(239,68,68,.25);margin-bottom:.45rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+            <span style="font-weight:500;color:var(--danger)">${nom} ${a}</span>
+            <span class="badge b-pau">${lista.length} equipo${lista.length>1?'s':''}</span>
+          </div>
+          ${lista.map(c=>{
+            const eq=getEq(c.equipo_cod);
+            const diff=Math.abs(Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)));
+            return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0;border-bottom:1px solid var(--border)">
+              <span>${eq.nombre} <span style="color:var(--text3)">[${eq.codigo_interno}]</span></span>
+              <span style="color:var(--danger)">${diff}d · ${c.destino_envio}</span>
+            </div>`;
+          }).join('')}
+        </div>`;
+      }).join('');
+    })()}`:''}
 
     <!-- OTs -->
     <div class="shd"><i class="ti ti-clipboard-list"></i> OTs de Trabajo</div>
@@ -2407,6 +2487,7 @@ function renderJefeDash(tc){
       }).join('')||'<div style="font-size:12px;color:var(--text2)">Sin datos</div>'}
     </div>`;
 }
+
 
 function renderEquipos(tc){
   const eqs=visibleEquipos();
@@ -2827,128 +2908,196 @@ function renderAdminKPIs(tc){
   const tot=ots.length; const fin=ots.filter(o=>o.estado==='finalizada').length;
   const paus=ots.filter(o=>o.estado==='pausada').length;
   const cumpl=tot?Math.round(fin/tot*100):0;
-  const hP=ots.reduce((a,o)=>a+(o.horas_programadas||0),0);
-  const hE=ots.reduce((a,o)=>a+(o.horas_ejecutadas||0),0);
-  const efic=hP?Math.round(hE/hP*100):0;
   const atras=ots.filter(o=>o.estado!=='finalizada'&&o.fecha_programada<hoy);
   const ncTotal=S.inspecciones.reduce((a,i)=>a+(i.total_nc||0),0);
+  const {lunStr,domStr}=getWeekRange();
+  const {nextLunStr,nextDomStr}=getNextWeekRange();
+
+  // Reutilizar la misma función dashKPIs del Jefe
+  function dashKPIsAdmin(eqList, comList){
+    const proceso=eqList.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso').length;
+    const disp=eqList.filter(e=>e.estado_equipo==='Disponible').length;
+    const ruta=eqList.filter(e=>e.estado_equipo==='En Ruta').length;
+    const atrasados=comList.filter(c=>{
+      if(c.estado==='Entregado') return false;
+      const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
+      return c.fecha_limite<hoy&&(eq?.estado_equipo||'En Proceso')==='En Proceso';
+    }).length;
+    const entSemana=comList.filter(c=>c.estado==='Entregado'&&c.fecha_entrega_real>=lunStr&&c.fecha_entrega_real<=domStr).length;
+    const comsSem=comList.filter(c=>c.estado!=='Entregado');
+    const metaSem=comsSem.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length;
+    const proxSem=comsSem.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr).length;
+    const rutaSem=comsSem.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq?.estado_equipo==='En Ruta'&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;}).length;
+    const dispSem=comsSem.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq?.estado_equipo==='Disponible'&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;}).length;
+    const pendSem=metaSem;
+    const pctSem=metaSem?Math.min(100,Math.round(entSemana/metaSem*100)):0;
+    return {proceso,disp,ruta,atrasados,entSemana,metaSem,proxSem,rutaSem,dispSem,pendSem,pctSem};
+  }
+
+  function kpiBlocksA(k){
+    return `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="border:1.5px solid var(--acc2);border-radius:10px;padding:10px 12px">
+          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-tool"></i> En Proceso</div>
+          <div style="font-size:28px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
+        </div>
+        <div style="border:1.5px solid var(--danger);border-radius:10px;padding:10px 12px;background:rgba(239,68,68,.05)">
+          <div style="font-size:10px;font-weight:500;color:var(--danger);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-alert-triangle"></i> Atrasados</div>
+          <div style="font-size:28px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.atrasados}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
+        <div style="border:1.5px solid var(--acc3);border-radius:10px;padding:10px 10px">
+          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-circle-check"></i> Disponibles</div>
+          <div style="font-size:24px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
+        </div>
+        <div style="border:1.5px solid #ef9f27;border-radius:10px;padding:10px 10px">
+          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-truck"></i> En Ruta</div>
+          <div style="font-size:24px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
+        </div>
+        <div style="border:1.5px solid #7f77dd;border-radius:10px;padding:10px 10px">
+          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-flag"></i> Entregados sem.</div>
+          <div style="font-size:24px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+        <div style="border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px">
+          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-calendar-week"></i> Esta semana</div>
+          <div style="font-size:24px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.metaSem}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">compromisos</div>
+        </div>
+        <div style="border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px">
+          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-calendar"></i> Próxima semana</div>
+          <div style="font-size:24px;font-weight:500;color:var(--text2);font-family:var(--fm)">${k.proxSem}</div>
+          <div style="font-size:10px;color:var(--text2);margin-top:2px">compromisos</div>
+        </div>
+      </div>`;
+  }
+
+  function sitioBlocksA(list){
+    return list.filter(s=>s.total>0).map(s=>`
+      <div style="border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span style="font-size:13px;font-weight:500;color:var(--text)">${s.nombre}</span>
+          <span style="font-size:11px;color:var(--text2)">${s.total} equipos</span>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
+          <div style="border:1px solid var(--acc2);border-radius:8px;padding:8px 10px">
+            <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-tool"></i> En Proceso</div>
+            <div style="font-size:22px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${s.proceso}</div>
+          </div>
+          <div style="border:1px solid var(--danger);border-radius:8px;padding:8px 10px;background:rgba(239,68,68,.04)">
+            <div style="font-size:9px;color:var(--danger);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-alert-triangle"></i> Atrasados</div>
+            <div style="font-size:22px;font-weight:500;color:var(--danger);font-family:var(--fm)">${s.atrasados}</div>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+          <div style="border:1px solid var(--acc3);border-radius:8px;padding:7px 8px">
+            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-circle-check"></i> Disponibles</div>
+            <div style="font-size:18px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${s.disp}</div>
+          </div>
+          <div style="border:1px solid #ef9f27;border-radius:8px;padding:7px 8px">
+            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-truck"></i> En Ruta</div>
+            <div style="font-size:18px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${s.ruta}</div>
+          </div>
+          <div style="border:1px solid #7f77dd;border-radius:8px;padding:7px 8px">
+            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-flag"></i> Entregados</div>
+            <div style="font-size:18px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${s.entSemana}</div>
+          </div>
+        </div>
+      </div>`).join('');
+  }
+
   const areaActual=S.areaFiltro||'todos';
   const eqBase=areaActual==='todos'?S.equipos:S.equipos.filter(e=>e.area===areaActual);
-  const comsBase=areaActual==='todos'?S.compromisos:S.compromisos.filter(c=>{
+  const comBase=areaActual==='todos'?S.compromisos:S.compromisos.filter(c=>{
     const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
     return eq&&eq.area===areaActual;
   });
-  const {lunStr,domStr}=getWeekRange();
-  const {nextLunStr,nextDomStr}=getNextWeekRange();
-  const coms=comsBase.filter(c=>c.estado!=='Entregado');
-  const comsAtras=coms.filter(c=>c.fecha_limite<hoy);
-  const comsSemana=coms.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr);
-  const comsProxSemana=coms.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr);
-  const eqEnProceso=eqBase.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso');
-  const eqDisponible=eqBase.filter(e=>e.estado_equipo==='Disponible');
+  const kActual=dashKPIsAdmin(eqBase,comBase);
+
+  const sitioData=['Lo Pinto','La Negra'].map(nombre=>{
+    const eqS=eqBase.filter(e=>e.sucursal===nombre);
+    const comS=comBase.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq?.sucursal===nombre;});
+    const k=dashKPIsAdmin(eqS,comS);
+    return {...k,nombre,total:eqS.length};
+  });
+
+  // Atrasados detalle por mes
+  const comsAtrasCorr=comBase.filter(c=>{
+    if(c.estado==='Entregado') return false;
+    const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
+    return c.fecha_limite<hoy&&(eq?.estado_equipo||'En Proceso')==='En Proceso';
+  });
   const atrasosPorMes={};
-  comsAtras.forEach(c=>{
+  comsAtrasCorr.forEach(c=>{
     const mes=c.fecha_limite?c.fecha_limite.substring(0,7):'Sin fecha';
     if(!atrasosPorMes[mes]) atrasosPorMes[mes]=[];
     atrasosPorMes[mes].push(c);
   });
-  const sucursales=['Lo Pinto','La Negra'];
-  const eqPorSuc=sucursales.map(s=>({
-    s,
-    total:eqBase.filter(e=>e.sucursal===s).length,
-    enProceso:eqBase.filter(e=>e.sucursal===s&&(e.estado_equipo||'En Proceso')==='En Proceso').length,
-    disponible:eqBase.filter(e=>e.sucursal===s&&e.estado_equipo==='Disponible').length,
-    atrasados:coms.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.sucursal===s&&c.fecha_limite<hoy;}).length,
-    semana:coms.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.sucursal===s&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;}).length,
-    proxSemana:coms.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.sucursal===s&&c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr;}).length,
-  }));
-  const porArea=areaActual==='todos'?AREAS.map(a=>({
-    a,
-    total:S.equipos.filter(e=>e.area===a).length,
-    enProceso:S.equipos.filter(e=>e.area===a&&(e.estado_equipo||'En Proceso')==='En Proceso').length,
-    disponible:S.equipos.filter(e=>e.area===a&&e.estado_equipo==='Disponible').length,
-    atrasados:S.compromisos.filter(c=>{
-      if(c.estado==='Entregado'||c.fecha_limite>=hoy) return false;
-      const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
-      return eq&&eq.area===a;
-    }).length,
-  })):[];
+
   tc.innerHTML=`
-    ${(atras.length||comsAtras.length)?`<div class="card" style="border-color:rgba(239,68,68,.35);margin-bottom:.65rem">
-      <div class="ct" style="color:var(--danger);margin-bottom:.3rem"><i class="ti ti-alert-triangle"></i> Atención Requerida</div>
-      ${atras.length?`<div style="font-size:12px;color:var(--danger)">${atras.length} OT(s) atrasada(s)</div>`:''}
-      ${comsAtras.length?`<div style="font-size:12px;color:var(--danger)">${comsAtras.length} equipo(s) con fecha límite vencida</div>`:''}</div>`:''}
-    ${areaActual!=='todos'?`<div style="padding:.4rem .7rem;background:${AREA_CFG[areaActual]?.bg};border:1px solid ${AREA_CFG[areaActual]?.col};border-radius:8px;margin-bottom:.65rem;font-size:12px;color:${AREA_CFG[areaActual]?.col};font-weight:500"><i class="ti ${AREA_CFG[areaActual]?.icon}"></i> Viendo: ${areaActual} (${eqBase.length} equipos)</div>`:''}
-    <div class="shd"><i class="ti ti-tractor"></i> Equipos${areaActual!=='todos'?' — '+areaActual:''}</div>
-    <div class="sg">
-      <div class="sc"><div class="sv" style="color:var(--acc)">${eqBase.length}</div><div class="sl">Total</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc2)">${eqEnProceso.length}</div><div class="sl">En Proceso</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc3)">${eqDisponible.length}</div><div class="sl">Disponibles</div></div>
-      <div class="sc"><div class="sv" style="color:var(--danger)">${comsAtras.length}</div><div class="sl">Atrasados</div></div>
+    <!-- ÁREA TABS -->
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-layout-grid"></i> Ver por área</div>
+    <div style="display:flex;gap:6px;margin-bottom:10px">
+      ${['todos',...AREAS].map(a=>`<div onclick="S.areaFiltro='${a}';renderRole()"
+        style="flex:1;padding:6px 4px;text-align:center;border:1.5px solid ${areaActual===a?'var(--acc2)':'var(--border)'};border-radius:8px;font-size:11px;cursor:pointer;color:${areaActual===a?'var(--acc2)':'var(--text2)'};background:${areaActual===a?'rgba(59,130,246,.08)':'var(--bg)'};font-weight:${areaActual===a?'500':'400'}">
+        ${a==='todos'?'Todos':a}
+      </div>`).join('')}
     </div>
-    <div class="sg">
-      <div class="sc"><div class="sv" style="color:var(--acc)">${comsSemana.length}</div><div class="sl">Esta semana</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc2)">${comsProxSemana.length}</div><div class="sl">Próx. semana</div></div>
+
+    <!-- KPIs -->
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px">
+      <i class="ti ti-tool"></i> Estado actual${areaActual!=='todos'?' — '+areaActual:''}
     </div>
-    ${areaActual==='todos'&&porArea.length?`<div class="shd"><i class="ti ti-layout-grid"></i> Por Área</div>
-    ${porArea.map(x=>`<div class="card" style="border-color:${AREA_CFG[x.a]?.col};margin-bottom:.4rem">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.3rem">
-        <div style="display:flex;align-items:center;gap:.4rem"><i class="ti ${AREA_CFG[x.a]?.icon}" style="color:${AREA_CFG[x.a]?.col}"></i>
-          <span style="font-weight:500;font-size:13px;color:${AREA_CFG[x.a]?.col}">${x.a}</span></div>
-        <span style="font-family:var(--fm);font-size:11px;color:var(--text2)">${x.total} equipos</span>
-      </div>
-      <div style="display:flex;gap:.5rem;flex-wrap:wrap">
-        <span style="font-size:11px;color:var(--acc2)">${x.enProceso} en proceso</span>
-        <span style="font-size:11px;color:var(--acc3)">${x.disponible} disponibles</span>
-        ${x.atrasados?`<span style="font-size:11px;color:var(--danger)">${x.atrasados} atrasados</span>`:''}
-      </div></div>`).join('')}`:''}
-    <div class="shd"><i class="ti ti-building"></i> Por Sucursal</div>
-    ${eqPorSuc.filter(s=>s.total>0).map(s=>`<div class="card" style="margin-bottom:.5rem">
-      <div class="ct" style="margin-bottom:.4rem">${s.s}</div>
-      <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.35rem">
-        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc)">${s.total}</div><div class="sl">Total</div></div>
-        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc2)">${s.enProceso}</div><div class="sl">En Proceso</div></div>
-        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--acc3)">${s.disponible}</div><div class="sl">Disponibles</div></div>
-        <div class="sc" style="flex:1;min-width:55px;padding:.45rem"><div class="sv" style="font-size:15px;color:var(--danger)">${s.atrasados}</div><div class="sl">Atrasados</div></div>
-      </div>
-      <div style="display:flex;gap:.4rem">
-        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.35rem;text-align:center"><div style="font-size:13px;font-weight:600;color:var(--acc);font-family:var(--fm)">${s.semana}</div><div style="font-size:9px;color:var(--text2);text-transform:uppercase">Esta semana</div></div>
-        <div style="flex:1;background:var(--bg3);border-radius:8px;padding:.35rem;text-align:center"><div style="font-size:13px;font-weight:600;color:var(--acc2);font-family:var(--fm)">${s.proxSemana}</div><div style="font-size:9px;color:var(--text2);text-transform:uppercase">Próx. semana</div></div>
-      </div></div>`).join('')}
-    ${comsAtras.length?`<div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Atrasados por Mes (${comsAtras.length})</div>
+    ${kpiBlocksA(kActual)}
+
+    <!-- POR SITIO -->
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-map-pin"></i> Por sitio${areaActual!=='todos'?' — '+areaActual:''}</div>
+    ${sitioBlocksA(sitioData)}
+
+    <!-- ATRASADOS DETALLE -->
+    ${kActual.atrasados>0?`
+    <div style="font-size:10px;font-weight:500;color:var(--danger);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:rgba(239,68,68,.08);border-radius:8px;margin-bottom:8px"><i class="ti ti-alert-triangle"></i> Detalle de atrasados</div>
     ${Object.entries(atrasosPorMes).sort().map(([mes,lista])=>{
-      const [anio,m]=mes.split('-');
-      const nomMes=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m)]||mes;
+      const [a,m]=mes.split('-');
+      const nom=['','Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'][parseInt(m)]||mes;
       return `<div class="card" style="border-color:rgba(239,68,68,.25);margin-bottom:.45rem">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
-          <span style="font-weight:500;color:var(--danger)">${nomMes} ${anio}</span>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
+          <span style="font-weight:500;color:var(--danger)">${nom} ${a}</span>
           <span class="badge b-pau">${lista.length} equipo${lista.length>1?'s':''}</span>
         </div>
         ${lista.map(c=>{
           const eq=getEq(c.equipo_cod);
-          const d=Math.abs(Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)));
-          return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:.2rem 0;border-bottom:1px solid var(--border)">
-            <span>${eq.nombre} ${areaBadge(eq.area)}</span>
-            <span style="color:var(--danger)">${d}d · ${c.destino_envio}</span></div>`;
+          const diff=Math.abs(Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)));
+          return `<div style="display:flex;justify-content:space-between;font-size:11px;padding:.25rem 0;border-bottom:1px solid var(--border)">
+            <span>${eq.nombre} <span style="color:var(--text3)">[${eq.codigo_interno}]</span></span>
+            <span style="color:var(--danger)">${diff}d · ${c.destino_envio}</span>
+          </div>`;
         }).join('')}
       </div>`;
     }).join('')}`:''}
-    <div class="shd"><i class="ti ti-dashboard"></i> OTs de Trabajo</div>
+
+    <!-- OTs -->
+    <div class="shd"><i class="ti ti-clipboard-list"></i> OTs de Trabajo</div>
     <div class="sg">
       <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">Total OTs</div></div>
       <div class="sc"><div class="sv" style="color:var(--acc3)">${cumpl}%</div><div class="sl">Cumplimiento</div></div>
       <div class="sc"><div class="sv" style="color:var(--acc2)">${ots.filter(o=>['en_ejecucion','en_proceso'].includes(o.estado)).length}</div><div class="sl">En Curso</div></div>
       <div class="sc"><div class="sv" style="color:var(--warn)">${paus}</div><div class="sl">Pausadas</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc)">${efic}%</div><div class="sl">Efic. Horas</div></div>
-      <div class="sc"><div class="sv" style="color:${ncTotal>0?'var(--danger)':'var(--acc3)'}">${ncTotal}</div><div class="sl">No Conformes</div></div>
     </div>
+    ${atras.length?`<div class="card" style="border-color:rgba(239,68,68,.2)">
+      <div class="ct" style="color:var(--danger);margin-bottom:.35rem"><i class="ti ti-clock-off"></i> OTs Atrasadas (${atras.length})</div>
+      ${atras.map(o=>`<div style="font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)">${o.id_ot} · ${o.nombre} · ${fmtDate(o.fecha_programada)}</div>`).join('')}
+    </div>`:''}
     <div class="card">
-      <div class="ct" style="margin-bottom:.35rem">Horas ejecutadas vs programadas</div>
-      <div style="display:flex;justify-content:space-between;font-size:10px;color:var(--text2);margin-bottom:.2rem"><span>${hE}h ejecutadas</span><span>${hP}h programadas</span></div>
-      ${pbw(efic)}
+      <div class="ct" style="margin-bottom:.5rem">Inspecciones</div>
+      <div class="sg">
+        <div class="sc"><div class="sv" style="color:var(--acc)">${S.inspecciones.length}</div><div class="sl">Total</div></div>
+        <div class="sc"><div class="sv" style="color:var(--danger)">${ncTotal}</div><div class="sl">NC Totales</div></div>
+      </div>
     </div>`;
 }
-
 function renderAdminUsuarios(tc){
   const rolCfg={admin:{cls:'b-new',lbl:'Admin'},jefe:{cls:'b-pen',lbl:'Jefe'},planificador:{cls:'b-run',lbl:'Planificador'},supervisor:{cls:'b-don',lbl:'Supervisor'}};
   tc.innerHTML=`
