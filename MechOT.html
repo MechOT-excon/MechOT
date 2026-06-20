@@ -1101,9 +1101,10 @@ async function finOT(id_ot){
 async function generarPDF(id_ot, silent=false){
   const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
   const tareas=JSON.parse(o.tareas_json||'[]');
-  const done=tareas.filter(t=>t.check).length;
+  const tareasBase=tareas; // definir aquí para usar en todo el PDF
   let reportes=[];
   try{reportes=await supa.get('reportes_avance',`ot_id=eq.${id_ot}&order=fecha_reporte.asc`);}catch(e){}
+  if(!reportes) reportes=[];
 
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a4'});
@@ -1159,9 +1160,6 @@ async function generarPDF(id_ot, silent=false){
   doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(59,130,246);
   doc.text('DETALLE DE TAREAS',M,y); y+=7;
 
-  // Construir historial por tarea a partir de todos los reportes
-  // Cada reporte tiene tareas_json con el estado de cada tarea en ese momento
-  const tareasBase=JSON.parse(o.tareas_json||'[]');
 
   for(let ti=0;ti<tareasBase.length;ti++){
     const tarea=tareasBase[ti];
