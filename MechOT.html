@@ -765,8 +765,9 @@ async function openSupOT(id_ot){
   const fin=o.estado==='finalizada';
   const tareas=JSON.parse(o.tareas_json||'[]');
   const chkDone=tareas.filter(t=>t.check).length;
-  const horasTotales=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
-  const avancePct=o.horas_programadas?Math.min(100,Math.round(horasTotales/o.horas_programadas*100)):0;
+  const horasProgCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||0),0);
+  const horasEjecutadas=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
+  const avancePct=o.horas_programadas?Math.min(100,Math.round(horasProgCompletadas/o.horas_programadas*100)):0;
   const hoy=today();
   const com=visibleCompromisos().find(c=>c.equipo_cod===eq.codigo_interno&&c.estado!=='Entregado');
   let comAlert='';
@@ -807,7 +808,7 @@ async function openSupOT(id_ot){
     <div class="card" style="border-color:rgba(245,158,11,.3)">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
         <div class="ct" style="color:var(--acc)"><i class="ti ti-list-check"></i> Tareas y Horas</div>
-        <span style="font-size:11px;color:var(--text2)">${horasTotales}/${o.horas_programadas}h · ${avancePct}%</span>
+        <span style="font-size:11px;color:var(--text2)">${horasEjecutadas}h reales · ${avancePct}% avance</span>
       </div>
       ${pbw(avancePct)}
       <div style="margin-top:.5rem">
@@ -821,10 +822,11 @@ async function openSupOT(id_ot){
           </div>
           <div style="display:flex;align-items:center;gap:.5rem;padding-left:1.7rem;flex-wrap:wrap">
             <i class="ti ti-clock" style="font-size:11px;color:var(--text3)"></i>
+            <span style="font-size:10px;color:var(--text3)">${t.horas_prog||0}h prog.</span>
             <input type="number" min="0" step="0.5" value="${t.horas||0}"
               onchange="actualizarHorasTarea('${id_ot}',${i},this.value)"
               style="width:60px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:2px 6px;color:var(--text);font-size:12px;font-family:var(--fm)">
-            <span style="font-size:10px;color:var(--text3)">horas</span>
+            <span style="font-size:10px;color:var(--text3)">h reales</span>
             <!-- Foto por tarea -->
             <div onclick="document.getElementById('fi-tarea-${i}').click()"
               style="display:flex;align-items:center;gap:.3rem;cursor:pointer;padding:3px 8px;border-radius:6px;border:1px solid ${t.fotoPendiente?'rgba(16,185,129,.4)':'var(--border)'};background:${t.fotoPendiente?'rgba(16,185,129,.08)':'var(--bg2)'}">
@@ -904,14 +906,15 @@ async function actualizarHorasTarea(id_ot, idx, valor){
   const o=S.ots.find(x=>x.id_ot===id_ot);
   const tareas=JSON.parse(o.tareas_json||'[]');
   tareas[idx].horas=parseFloat(valor)||0;
-  // Horas totales acumuladas
-  const horasTotales=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
-  // Avance = horas ejecutadas / horas programadas
-  const avance=o.horas_programadas?Math.min(100,Math.round(horasTotales/o.horas_programadas*100)):0;
+  // Avance = horas programadas de tareas COMPLETADAS / total horas programadas OT
+  const horasProgramadasCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||0),0);
+  const avance=o.horas_programadas?Math.min(100,Math.round(horasProgramadasCompletadas/o.horas_programadas*100)):0;
+  // Horas ejecutadas = suma real de horas trabajadas
+  const horasEjecutadas=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
   o.tareas_json=JSON.stringify(tareas);
-  o.horas_ejecutadas=horasTotales;
+  o.horas_ejecutadas=horasEjecutadas;
   o.avance_pct=avance;
-  await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,horas_ejecutadas:horasTotales,avance_pct:avance});
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,horas_ejecutadas:horasEjecutadas,avance_pct:avance});
 }
 
 // Foto avance general (opcional)
@@ -928,20 +931,21 @@ function handleFotoAvance(inp){
 let _fotosTareas={};
 function handleFotoTarea(idx, inp){
   if(!inp.files||!inp.files[0]) return;
-  comprimirImagen(inp.files[0]).then(comp=>{
-    _fotosTareas[idx]=comp;
-    // Marcar visualmente que tiene foto
-    const s=S.ots.find(o=>o.tareas_json);
-    // Actualizar el botón visualmente
-    const btn=inp.parentElement;
-    if(btn){
-      btn.style.borderColor='rgba(16,185,129,.4)';
-      btn.style.background='rgba(16,185,129,.08)';
-      btn.innerHTML=`<input type="file" id="fi-tarea-${idx}" accept="image/*" capture="environment" onchange="handleFotoTarea(${idx},this)" style="display:none">
-        <i class="ti ti-photo-check" style="font-size:12px;color:var(--acc3)"></i>
-        <span style="font-size:10px;color:var(--acc3)">Foto lista</span>`;
-    }
-  });
+  const file=inp.files[0];
+  // Guardar el File original inmediatamente, comprimir al subir
+  _fotosTareas[String(idx)]=file;
+  // Actualizar botón visualmente
+  const btn=inp.closest?inp.closest('[onclick]'):inp.parentElement;
+  const container=document.getElementById(`fi-tarea-${idx}`)?.parentElement;
+  if(container){
+    container.style.borderColor='rgba(16,185,129,.4)';
+    container.style.background='rgba(16,185,129,.08)';
+    const icon=container.querySelector('i');
+    const span=container.querySelector('span');
+    if(icon) icon.className='ti ti-photo-check';
+    if(span){span.textContent='Foto ✓';span.style.color='var(--acc3)';}
+  }
+  console.log(`Foto tarea ${idx} guardada, total fotos: ${Object.keys(_fotosTareas).length}`);
 }
 
 async function handleFotoCierre(id_ot,inp){
@@ -965,27 +969,34 @@ async function handleFotoCierre(id_ot,inp){
 async function saveAvance(id_ot){
   const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
   const tareas=JSON.parse(o.tareas_json||'[]');
-  const horasTotales=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
-  const avance=o.horas_programadas?Math.min(100,Math.round(horasTotales/o.horas_programadas*100)):0;
+  // Horas reales ejecutadas (suma de lo que tardaron)
+  const horasEjecutadas=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
+  // Avance = horas PROGRAMADAS de tareas completadas / total horas programadas OT
+  const horasProgCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||0),0);
+  const avance=o.horas_programadas?Math.min(100,Math.round(horasProgCompletadas/o.horas_programadas*100)):0;
   const notas=document.getElementById('nv')?.value||'';
 
-  // Subir fotos por tarea
+  // Capturar y limpiar _fotosTareas antes de subir (evitar condiciones de carrera)
+  const fotasParaSubir={...(_fotosTareas)};
+  _fotosTareas={};
+
+  // Subir fotos por tarea (comprimir en el momento de subir)
   const fotosPorTarea={};
-  for(const [idx,file] of Object.entries(_fotosTareas)){
+  for(const [idx,file] of Object.entries(fotasParaSubir)){
     if(!file) continue;
     const ts=new Date().toISOString().replace(/[:.]/g,'-');
     const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/tarea${idx}_${ts}.jpg`;
     try{
-      fotosPorTarea[idx]=await supa.upload(path,file);
+      const comp=await comprimirImagen(file);
+      fotosPorTarea[idx]=await supa.upload(path,comp);
+      console.log(`Foto tarea ${idx} subida: ${fotosPorTarea[idx]}`);
     }catch(e){
       addAlert('warn',`Foto tarea ${parseInt(idx)+1} — OT ${id_ot}`,'No se pudo subir. Intenta de nuevo.');
     }
   }
-  _fotosTareas={};
 
   // Subir foto general si hay
   let fotoUrl=null;
-  let fotoFallo=false;
   if(_fotoAvanceFile){
     const ts=new Date().toISOString().replace(/[:.]/g,'-');
     const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/avance_${ts}.jpg`;
@@ -993,7 +1004,7 @@ async function saveAvance(id_ot){
       const fileComp=await comprimirImagen(_fotoAvanceFile);
       fotoUrl=await supa.upload(path,fileComp);
     }catch(e){
-      fotoFallo=true;
+      addAlert('warn',`Foto general — OT ${id_ot}`,'No se pudo subir la foto general.');
     }
     _fotoAvanceFile=null;
   }
@@ -1002,29 +1013,26 @@ async function saveAvance(id_ot){
   const tareasConFoto=tareas.map((t,i)=>({
     nombre:t.nombre, check:t.check,
     horas:t.horas||0, tecnico:o.tecnico, fecha:today(),
-    foto_tarea_url:fotosPorTarea[String(i)]||fotosPorTarea[i]||null
+    foto_tarea_url:fotosPorTarea[String(i)]||null
   }));
 
   const reporte={
     ot_id:id_ot, equipo_cod:o.equipo_cod,
-    avance_pct:avance, horas_ejecutadas:horasTotales,
+    avance_pct:avance, horas_ejecutadas:horasEjecutadas,
     notas, foto_url:fotoUrl,
     supervisor:S.userName,
     tareas_json:JSON.stringify(tareasConFoto)
   };
   try{await supa.post('reportes_avance',reporte);}catch(e){console.warn('Error reporte',e);}
 
-  // Actualizar OT
   let nuevoEstado=o.estado==='sin_iniciar'?'en_ejecucion':
     ['pausada','finalizada'].includes(o.estado)?o.estado:'en_proceso';
   await supa.patch('ots',`id_ot=eq.${id_ot}`,{
-    avance_pct:avance, horas_ejecutadas:horasTotales,
+    avance_pct:avance, horas_ejecutadas:horasEjecutadas,
     notas, estado:nuevoEstado, tareas_json:o.tareas_json
   });
-  o.avance_pct=avance; o.horas_ejecutadas=horasTotales;
+  o.avance_pct=avance; o.horas_ejecutadas=horasEjecutadas;
   o.notas=notas; o.estado=nuevoEstado;
-
-  if(fotoFallo) addAlert('warn',`Foto general no subida — OT ${id_ot}`,'El reporte se guardó pero la foto falló.');
 
   // PDF en 2do plano
   generarPDF(id_ot, true).catch(e=>{
@@ -1037,10 +1045,11 @@ async function togTask(id_ot,idx){
   const o=S.ots.find(x=>x.id_ot===id_ot);
   const tareas=JSON.parse(o.tareas_json||'[]');
   tareas[idx].check=!tareas[idx].check;
-  const done=tareas.filter(t=>t.check).length;
-  const pct=Math.round(done/tareas.length*100);
-  o.tareas_json=JSON.stringify(tareas); o.avance_pct=pct;
-  await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,avance_pct:pct});
+  // Avance = horas programadas de tareas completadas / total horas programadas OT
+  const horasProgCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||0),0);
+  const avance=o.horas_programadas?Math.min(100,Math.round(horasProgCompletadas/o.horas_programadas*100)):0;
+  o.tareas_json=JSON.stringify(tareas); o.avance_pct=avance;
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,avance_pct:avance});
   openSupOT(id_ot);
 }
 
@@ -1122,7 +1131,7 @@ async function generarPDF(id_ot, silent=false){
   doc.text(`Equipo: ${eq.nombre} [${eq.codigo_interno}]`,M,y); y+=5;
   doc.text(`Tecnico: ${o.tecnico} · Sitio: ${o.sucursal}`,M,y); y+=5;
   doc.text(`Fecha programada: ${fmtDate(o.fecha_programada)} · Fecha ejecucion: ${fmtDate(today())} · Estado: ${EC[o.estado]?.lbl||o.estado}`,M,y); y+=5;
-  doc.text(`Horas: ${o.horas_ejecutadas||0}h ejecutadas / ${o.horas_programadas}h programadas · Avance: ${o.avance_pct||0}%`,M,y); y+=8;
+  doc.text(`Horas: ${o.horas_ejecutadas||0}h reales / ${o.horas_programadas}h programadas · Avance: ${o.avance_pct||0}%`,M,y); y+=8;
 
   // Barra progreso
   doc.setFillColor(42,48,72); doc.rect(M,y,W-M*2,4,'F');
@@ -1136,12 +1145,13 @@ async function generarPDF(id_ot, silent=false){
   doc.setDrawColor(200,210,230); doc.rect(M,y-2,W-M*2,tareasBase.length*7+4,'S');
   tareasBase.forEach((t,i)=>{
     const isOK=t.check;
-    const hrs=parseFloat(t.horas)||0;
+    const hProg=parseFloat(t.horas_prog)||parseFloat(t.horas)||0;
+    const hReal=parseFloat(t.horas)||0;
     doc.setFontSize(8); doc.setFont(undefined,isOK?'bold':'normal');
     doc.setTextColor(isOK?34:60, isOK?139:60, isOK?34:60);
     doc.text(`${isOK?'[OK]':'[ ] '} ${i+1}. ${t.nombre}`,M+3,y+4);
     doc.setTextColor(100,100,100); doc.setFont(undefined,'normal');
-    doc.text(`${hrs}h`,W-M-3,y+4,{align:'right'});
+    doc.text(`${hProg}h prog / ${hReal}h real`,W-M-3,y+4,{align:'right'});
     y+=7;
   });
   y+=8;
@@ -1164,7 +1174,9 @@ async function generarPDF(id_ot, silent=false){
     doc.text(`${marcaTarea} ${ti+1}. ${tarea.nombre}`,M+2,y+4);
     // Técnico y fecha en encabezado de tarea
     doc.setFont(undefined,'normal'); doc.setFontSize(8); doc.setTextColor(200,220,255);
-    doc.text(`${o.tecnico} · ${fmtDate(tarea.fecha||o.fecha_programada)} · ${tarea.horas||0}h`,W-M-2,y+4,{align:'right'});
+    const hProgTarea=parseFloat(tarea.horas_prog)||parseFloat(tarea.horas)||0;
+    const hRealTarea=parseFloat(tarea.horas)||0;
+    doc.text(`${o.tecnico} · ${fmtDate(tarea.fecha||o.fecha_programada)} · ${hProgTarea}h prog / ${hRealTarea}h real`,W-M-2,y+4,{align:'right'});
     y+=11;
 
     // Reportes de avance para esta tarea en orden cronológico
