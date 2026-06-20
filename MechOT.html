@@ -761,11 +761,14 @@ function renderSupCompromisos(tc){
 
 // ===================== DETALLE OT SUPERVISOR =====================
 async function openSupOT(id_ot){
+  try{
   const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
+  if(!o||!eq){alert('Error: OT no encontrada');return;}
   const fin=o.estado==='finalizada';
   const tareas=JSON.parse(o.tareas_json||'[]');
   const chkDone=tareas.filter(t=>t.check).length;
-  const horasProgCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||0),0);
+  const horasPorTareaBase=o.horas_programadas/tareas.length;
+  const horasProgCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||horasPorTareaBase),0);
   const horasEjecutadas=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
   const avancePct=o.horas_programadas?Math.min(100,Math.round(horasProgCompletadas/o.horas_programadas*100)):0;
   const hoy=today();
@@ -899,15 +902,15 @@ async function openSupOT(id_ot){
     </div>`:''}
   `;
   document.getElementById('m-det').classList.remove('hidden');
+  }catch(e){console.error('openSupOT error:',e);alert('Error al abrir OT: '+e.message);}
 }
-
-// Actualizar horas de una tarea específica
 async function actualizarHorasTarea(id_ot, idx, valor){
   const o=S.ots.find(x=>x.id_ot===id_ot);
   const tareas=JSON.parse(o.tareas_json||'[]');
   tareas[idx].horas=parseFloat(valor)||0;
   // Avance = horas programadas de tareas COMPLETADAS / total horas programadas OT
-  const horasProgramadasCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||0),0);
+  const horasPorTareaF=o.horas_programadas/tareas.length;
+  const horasProgramadasCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||horasPorTareaF),0);
   const avance=o.horas_programadas?Math.min(100,Math.round(horasProgramadasCompletadas/o.horas_programadas*100)):0;
   // Horas ejecutadas = suma real de horas trabajadas
   const horasEjecutadas=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
@@ -931,21 +934,18 @@ function handleFotoAvance(inp){
 let _fotosTareas={};
 function handleFotoTarea(idx, inp){
   if(!inp.files||!inp.files[0]) return;
-  const file=inp.files[0];
-  // Guardar el File original inmediatamente, comprimir al subir
-  _fotosTareas[String(idx)]=file;
-  // Actualizar botón visualmente
-  const btn=inp.closest?inp.closest('[onclick]'):inp.parentElement;
-  const container=document.getElementById(`fi-tarea-${idx}`)?.parentElement;
-  if(container){
-    container.style.borderColor='rgba(16,185,129,.4)';
-    container.style.background='rgba(16,185,129,.08)';
-    const icon=container.querySelector('i');
-    const span=container.querySelector('span');
-    if(icon) icon.className='ti ti-photo-check';
-    if(span){span.textContent='Foto ✓';span.style.color='var(--acc3)';}
-  }
-  console.log(`Foto tarea ${idx} guardada, total fotos: ${Object.keys(_fotosTareas).length}`);
+  _fotosTareas[String(idx)]=inp.files[0];
+  // Feedback visual simple sin búsqueda DOM compleja
+  try{
+    inp.style.display='none';
+    const parent=inp.parentElement;
+    if(parent){
+      parent.style.borderColor='rgba(16,185,129,.4)';
+      parent.style.background='rgba(16,185,129,.08)';
+      parent.innerHTML=`<i class="ti ti-photo-check" style="font-size:12px;color:var(--acc3)"></i>
+        <span style="font-size:10px;color:var(--acc3)">✓</span>`;
+    }
+  }catch(e){}
 }
 
 async function handleFotoCierre(id_ot,inp){
@@ -971,8 +971,9 @@ async function saveAvance(id_ot){
   const tareas=JSON.parse(o.tareas_json||'[]');
   // Horas reales ejecutadas (suma de lo que tardaron)
   const horasEjecutadas=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
+  const horasPorTarea=o.horas_programadas/tareas.length;
   // Avance = horas PROGRAMADAS de tareas completadas / total horas programadas OT
-  const horasProgCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||0),0);
+  const horasProgCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||horasPorTarea),0);
   const avance=o.horas_programadas?Math.min(100,Math.round(horasProgCompletadas/o.horas_programadas*100)):0;
   const notas=document.getElementById('nv')?.value||'';
 
@@ -988,7 +989,7 @@ async function saveAvance(id_ot){
     const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/tarea${idx}_${ts}.jpg`;
     try{
       const comp=await comprimirImagen(file);
-      fotosPorTarea[idx]=await supa.upload(path,comp);
+      fotosPorTarea[idx]=await uploadConReintento(path,comp);
       console.log(`Foto tarea ${idx} subida: ${fotosPorTarea[idx]}`);
     }catch(e){
       addAlert('warn',`Foto tarea ${parseInt(idx)+1} — OT ${id_ot}`,'No se pudo subir. Intenta de nuevo.');
@@ -1002,7 +1003,7 @@ async function saveAvance(id_ot){
     const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/avance_${ts}.jpg`;
     try{
       const fileComp=await comprimirImagen(_fotoAvanceFile);
-      fotoUrl=await supa.upload(path,fileComp);
+      fotoUrl=await uploadConReintento(path,fileComp);
     }catch(e){
       addAlert('warn',`Foto general — OT ${id_ot}`,'No se pudo subir la foto general.');
     }
@@ -1045,8 +1046,9 @@ async function togTask(id_ot,idx){
   const o=S.ots.find(x=>x.id_ot===id_ot);
   const tareas=JSON.parse(o.tareas_json||'[]');
   tareas[idx].check=!tareas[idx].check;
-  // Avance = horas programadas de tareas completadas / total horas programadas OT
-  const horasProgCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||0),0);
+  // Si no hay horas_prog, distribuir horas programadas equitativamente
+  const horasPorTarea=o.horas_programadas/tareas.length;
+  const horasProgCompletadas=tareas.filter(t=>t.check).reduce((a,t)=>a+(parseFloat(t.horas_prog)||horasPorTarea),0);
   const avance=o.horas_programadas?Math.min(100,Math.round(horasProgCompletadas/o.horas_programadas*100)):0;
   o.tareas_json=JSON.stringify(tareas); o.avance_pct=avance;
   await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,avance_pct:avance});
@@ -1864,6 +1866,7 @@ async function saveEval(){
   const sinFoto=ncs.filter(i=>!i.foto);
   if(sinFoto.length){alert(`Falta foto en:\n${sinFoto.map(i=>`• ${i.name}`).join('\n')}`);return;}
   const idInsp='INSP-'+Date.now();
+  const fotosFallidas=[];
   for(const item of ncs){
     if(item.foto){
       try{
@@ -1872,10 +1875,18 @@ async function saveEval(){
         for(let k=0;k<bytes.length;k++) arr[k]=bytes.charCodeAt(k);
         const blob=new Blob([arr],{type:mime});
         const file=new File([blob],'nc.jpg',{type:mime});
+        const comp=await comprimirImagen(file);
         const path=`${eq.codigo_interno}/inspecciones/${idInsp}_${item.name.replace(/\s+/g,'_').substring(0,25)}.jpg`;
-        item.foto_url=await supa.upload(path,file);
-      }catch(e){console.warn(e);}
+        // Intentar hasta 3 veces con reintento automático
+        let url=null;
+        try{url=await uploadConReintento(path,comp);}
+        catch(e){fotosFallidas.push(item.name);}
+        item.foto_url=url;
+      }catch(e){fotosFallidas.push(item.name);}
     }
+  }
+  if(fotosFallidas.length){
+    addAlert('warn','Fotos NC no subidas',`Fallaron: ${fotosFallidas.join(', ')}. Se guardó la inspección sin esas fotos.`);
   }
   const conformes=realItems.filter(i=>i.estado==='B').length;
   const inspData={
@@ -1890,13 +1901,23 @@ async function saveEval(){
     const res=await supa.post('inspecciones',inspData);
     S.inspecciones.unshift(res[0]);
     if(ncs.length>0) addAlert('crit',`${st.tipoInsp} ${eq.nombre}`,`${ncs.length} no conforme(s)`);
-    // PDF en background
     generarPDFInspeccion(idInsp,eq,st,realItems,ncs,inspData).catch(e=>console.warn('PDF insp error:',e));
     cm('m-eval'); renderRole();
-    alert(`✓ Inspección guardada\n✓ ${conformes} Bueno · ✗ ${ncs.length} NC · ${inspData.total_na} NA`);
+    alert(`✓ Inspección guardada\n✓ ${conformes} Bueno · ✗ ${ncs.length} NC · ${inspData.total_na} NA${fotosFallidas.length?`\n⚠ ${fotosFallidas.length} foto(s) no subidas`:''}`);
   }catch(e){alert('Error: '+e.message);}
 }
 
+
+// Upload con hasta 3 reintentos automáticos
+async function uploadConReintento(path, file, intentos=3){
+  for(let i=0;i<intentos;i++){
+    try{ return await supa.upload(path,file); }
+    catch(e){
+      if(i===intentos-1) throw e;
+      await new Promise(r=>setTimeout(r,1500*(i+1))); // espera 1.5s, 3s
+    }
+  }
+}
 
 // Comprimir imagen antes de subir (máx 1200px, calidad 0.75)
 async function comprimirImagen(file, maxPx=1200, calidad=0.75){
