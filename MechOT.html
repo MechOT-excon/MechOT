@@ -1058,67 +1058,502 @@ async function generarPDF(id_ot, silent=false){
 
 // ===================== INSPECCIONES =====================
 // Tipos de equipo con plantillas AT1
-const TIPOS_AT1 = ['Articulado Tolva','Bulldozer','Cargador Frontal','Excavadora','Motoniveladora'];
+// ===================== INSPECCIONES =====================
+const TIPOS_AT1 = ['Articulado Tolva','Bulldozer','Cargador Frontal','Excavadora','Motoniveladora','Otro (usar plantilla Cargador Frontal)'];
+const SUBTIPOS_CAMION = ['Camión Tolva','Camión Pluma','Camión Aljibe','Camión Combustible','Camión Mantención'];
 
 function renderSupEval(tc){
   tc.innerHTML=`
-    <div class="shd"><i class="ti ti-clipboard-check"></i> Inspección AT1 — Tipo de Equipo</div>
-    ${TIPOS_AT1.map(tipo=>{
-      const count=S.plantillas.filter(p=>p.tipo_equipo===tipo).length;
-      return `<div class="card" style="cursor:pointer" onclick="openEvalSel('${tipo}')">
+    <div class="shd"><i class="ti ti-clipboard-check"></i> Tipo de Inspección</div>
+
+    <!-- Checklist Estándar -->
+    <div class="card" style="cursor:pointer;margin-bottom:.45rem" onclick="iniciarChecklistEstandar()">
+      <div style="display:flex;align-items:center;gap:.65rem">
+        <div style="width:38px;height:38px;border-radius:8px;background:rgba(16,185,129,.12);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--acc3)">
+          <i class="ti ti-list-check"></i></div>
+        <div><div class="ct">Checklist Estándar</div>
+          <div class="cs">Recepción / Despacho de Equipo · ${S.plantillas.filter(p=>p.tipo_inspeccion==='Checklist Estandar').length} ítems</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--text3);margin-left:auto"></i>
+      </div></div>
+
+    <!-- Levantamiento Mecánico AT1 -->
+    <div class="shd"><i class="ti ti-engine"></i> Levantamiento Mecánico AT1 — Maquinaria Pesada</div>
+    ${TIPOS_AT1.map(tipo=>`
+      <div class="card" style="cursor:pointer;margin-bottom:.35rem" onclick="openEvalSel('${tipo}','AT1')">
         <div style="display:flex;align-items:center;gap:.65rem">
-          <div style="width:38px;height:38px;border-radius:8px;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--acc2)">
+          <div style="width:38px;height:38px;border-radius:8px;background:rgba(59,130,246,.12);display:flex;align-items:center;justify-content:center;font-size:15px;color:var(--acc2)">
             <i class="ti ti-clipboard-list"></i></div>
-          <div><div class="ct">${tipo}</div><div class="cs">${count} ítems AT1</div></div>
+          <div><div class="ct">${tipo}</div>
+            <div class="cs">${S.plantillas.filter(p=>p.tipo_equipo===tipo&&p.tipo_inspeccion==='AT1').length} ítems AT1</div></div>
           <i class="ti ti-chevron-right" style="color:var(--text3);margin-left:auto"></i>
-        </div></div>`;
-    }).join('')}
+        </div></div>`).join('')}
+
+    <!-- Levantamiento Mecánico Camiones -->
+    <div class="shd"><i class="ti ti-truck"></i> Levantamiento Mecánico — Camiones</div>
+    <div class="card" style="cursor:pointer;margin-bottom:.45rem" onclick="mostrarSubtiposCamion()">
+      <div style="display:flex;align-items:center;gap:.65rem">
+        <div style="width:38px;height:38px;border-radius:8px;background:rgba(245,158,11,.12);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--acc)">
+          <i class="ti ti-truck"></i></div>
+        <div><div class="ct">Seleccionar tipo de camión</div>
+          <div class="cs">Tolva · Pluma · Aljibe · Combustible · Mantención</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--text3);margin-left:auto"></i>
+      </div></div>
+
+    <!-- Levantamiento Neumáticos -->
+    <div class="shd"><i class="ti ti-circle"></i> Levantamiento Neumáticos</div>
+    <div class="card" style="cursor:pointer;margin-bottom:.45rem" onclick="iniciarLevantamientoNeumaticos()">
+      <div style="display:flex;align-items:center;gap:.65rem">
+        <div style="width:38px;height:38px;border-radius:8px;background:rgba(139,92,246,.12);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--acc4)">
+          <i class="ti ti-circle"></i></div>
+        <div><div class="ct">Levantamiento Neumáticos</div>
+          <div class="cs">Marca · Modelo · Medida · Estado · Foto por posición</div></div>
+        <i class="ti ti-chevron-right" style="color:var(--text3);margin-left:auto"></i>
+      </div></div>
+
+    <!-- Recientes -->
     <div class="shd"><i class="ti ti-history"></i> Inspecciones Recientes</div>
-    ${S.inspecciones.slice(0,5).map(ev=>`<div class="card" onclick="verInspeccion('${ev.id_inspeccion}')" style="cursor:pointer">
+    ${S.inspecciones.slice(0,5).map(ev=>`<div class="card" onclick="verInspeccion('${ev.id_inspeccion}')" style="cursor:pointer;margin-bottom:.35rem">
       <div class="chd">
         <div><div class="ct" style="font-size:12px">${getEq(ev.equipo_cod).nombre}</div>
           <div class="cs">${ev.tipo_inspeccion} · ${ev.inspector} · ${fmtDT(ev.fecha_inspeccion)}</div></div>
         <div style="text-align:right">
           <span style="color:var(--acc3);font-size:13px;font-weight:600">${ev.total_conformes}✓</span>
           <span style="color:var(--danger);font-size:13px;font-weight:600;margin-left:.35rem">${ev.total_nc}✗</span>
-        </div>
-      </div></div>`).join('')||`<div class="es" style="padding:1rem"><i class="ti ti-clipboard"></i>Sin inspecciones</div>`}`;
+        </div></div></div>`).join('')||`<div class="es" style="padding:1rem"><i class="ti ti-clipboard"></i>Sin inspecciones</div>`}`;
 }
 
-function openEvalSel(tipoEq){
-  document.getElementById('m-eval-t').textContent=`AT1 — ${tipoEq}`;
+// ── CHECKLIST ESTÁNDAR ──
+function iniciarChecklistEstandar(){
+  document.getElementById('m-eval-t').textContent='Checklist Estándar';
   document.getElementById('m-eval-b').innerHTML=`
-    <div style="font-size:11px;color:var(--acc2);background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:.5rem .65rem;margin-bottom:.65rem">
-      <i class="ti ti-info-circle"></i> Formulario AT1 · ${S.plantillas.filter(p=>p.tipo_equipo===tipoEq).length} ítems
+    <div class="fg"><label class="fl">Equipo</label>
+      <select class="fs" id="ev-eq-cs">${visibleEquipos().map(e=>`<option value="${e.codigo_interno}">[${e.codigo_interno}] ${e.nombre} — ${e.tipo}</option>`).join('')}</select></div>
+    <div class="r2">
+      <div class="fg"><label class="fl">Origen</label><input class="fi" id="cs-origen" placeholder="Lo Pinto"></div>
+      <div class="fg"><label class="fl">Destino</label><input class="fi" id="cs-destino" placeholder="La Negra"></div>
     </div>
-    <div class="fg"><label class="fl">Equipo a inspeccionar</label>
-      <select class="fs" id="ev-eq">
-        ${visibleEquipos().map(e=>`<option value="${e.codigo_interno}">[${e.codigo_interno}] ${e.nombre}</option>`).join('')}
+    <div class="fg"><label class="fl">Horómetro / Km</label><input class="fi" id="cs-horometro" placeholder="Ej: 1250 Hrs"></div>
+    <div class="fg"><label class="fl">Nivel de Combustible</label>
+      <select class="fs" id="cs-combustible">
+        <option>25%</option><option>50%</option><option>75%</option><option>100%</option>
       </select></div>
-    <div class="fg"><label class="fl">Horómetro actual</label>
-      <input class="fi" id="ev-horometro" type="number" placeholder="Ej: 12450" style="font-family:var(--fm)"></div>
-    <button class="btn bp bfull" onclick="startEval('${tipoEq}')">
-      <i class="ti ti-clipboard-check"></i> Iniciar Inspección AT1</button>`;
+    <div class="shd"><i class="ti ti-camera"></i> Foto Placa de Serie (obligatoria)</div>
+    <div class="pu" id="pu-serie" onclick="document.getElementById('fi-serie').click()">
+      <input type="file" id="fi-serie" accept="image/*" capture="environment" onchange="handleFotoCS('serie',this)">
+      <i class="ti ti-id" id="icon-serie"></i><div class="pu-txt" id="txt-serie">Toca para fotografiar la placa de serie</div></div>
+    <div class="shd"><i class="ti ti-file-text"></i> Documentación</div>
+    ${['Revisión Técnica','Emisión de Gases','Seguro Obligatorio','Permiso de Circulación'].map((doc,i)=>`
+      <div class="card" style="margin-bottom:.4rem">
+        <div style="font-size:12px;font-weight:500;margin-bottom:.4rem">${doc}</div>
+        <div style="display:flex;gap:.4rem;margin-bottom:.4rem">
+          <button class="btn bsm" id="doc-si-${i}" onclick="setDoc(${i},'SI')"
+            style="${'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}">✓ SI</button>
+          <button class="btn bsm" id="doc-no-${i}" onclick="setDoc(${i},'NO')"
+            style="background:var(--bg3);color:var(--text2);border:1px solid var(--border)">✗ NO</button>
+          <input class="fi" id="doc-fecha-${i}" type="date" placeholder="Vencimiento" style="flex:1;font-size:11px">
+        </div>
+        <div class="pu" id="pu-doc-${i}" onclick="document.getElementById('fi-doc-${i}').click()" style="padding:.4rem">
+          <input type="file" id="fi-doc-${i}" accept="image/*" capture="environment" onchange="handleFotoDoc(${i},this)">
+          <div style="font-size:10px;text-align:center;color:var(--text2)" id="txt-doc-${i}"><i class="ti ti-camera"></i> Foto del documento</div>
+        </div>
+      </div>`).join('')}
+    <button class="btn bp bfull" style="margin-top:.5rem" onclick="iniciarChecklistForm()">
+      <i class="ti ti-arrow-right"></i> Continuar con Inspección</button>`;
+  S.evalState={tipo:'Checklist Estandar',docs:[{v:null,fecha:'',foto:null},{v:null,fecha:'',foto:null},{v:null,fecha:'',foto:null},{v:null,fecha:'',foto:null}],fotoSerie:null,fotos4lados:{der:null,izq:null,front:null,post:null},fotosAdicionales:[]};
   document.getElementById('m-eval').classList.remove('hidden');
 }
 
-function startEval(tipoEq){
+let _csDocFotos=[null,null,null,null];
+let _csDocVals=['','','',''];
+function setDoc(i,v){
+  _csDocVals[i]=v;
+  ['SI','NO'].forEach(x=>{
+    const btn=document.getElementById(`doc-${x.toLowerCase()}-${i}`);
+    if(btn) btn.style.cssText=x===v?`background:${v==='SI'?'var(--acc3)':'var(--danger)'};color:#fff;border:none`:`background:var(--bg3);color:var(--text2);border:1px solid var(--border)`;
+  });
+}
+function handleFotoDoc(i,inp){
+  if(!inp.files||!inp.files[0]) return;
+  const r=new FileReader(); r.onload=e=>{_csDocFotos[i]=e.target.result;
+    const el=document.getElementById(`txt-doc-${i}`);
+    if(el)el.innerHTML='<i class="ti ti-photo-check" style="color:var(--acc3)"></i> Foto adjunta ✓';
+    document.getElementById(`pu-doc-${i}`)?.classList.add('ok');
+  }; r.readAsDataURL(inp.files[0]);
+}
+let _csFotoSerie=null;
+function handleFotoCS(tipo,inp){
+  if(!inp.files||!inp.files[0]) return;
+  const r=new FileReader(); r.onload=e=>{
+    if(tipo==='serie'){_csFotoSerie=e.target.result;
+      document.getElementById('icon-serie').className='ti ti-photo-check';
+      document.getElementById('txt-serie').textContent='Foto de serie ✓';
+      document.getElementById('pu-serie').classList.add('ok');}
+  }; r.readAsDataURL(inp.files[0]);
+}
+
+function iniciarChecklistForm(){
+  if(!_csFotoSerie){alert('La foto de la placa de serie es obligatoria');return;}
+  const cod=document.getElementById('ev-eq-cs').value;
+  const origen=document.getElementById('cs-origen').value;
+  const destino=document.getElementById('cs-destino').value;
+  const horometro=document.getElementById('cs-horometro').value;
+  const combustible=document.getElementById('cs-combustible').value;
+  const plantillas=S.plantillas.filter(p=>p.tipo_inspeccion==='Checklist Estandar');
+  const secciones={};
+  plantillas.forEach(p=>{const sec=p.seccion||'General';if(!secciones[sec])secciones[sec]=[];secciones[sec].push({name:p.item_inspeccion,tipo_resp:'BRM',estado:null,obs:'',foto:null,seccion:sec});});
+  const items=[];
+  Object.entries(secciones).forEach(([sec,its])=>{items.push({esSeccion:true,name:sec});its.forEach(it=>items.push(it));});
+  S.evalState={tipo:'Checklist Estandar',equipoCod:cod,origen,destino,horometro,combustible,
+    fotoSerie:_csFotoSerie,docs:_csDocVals.map((v,i)=>({valor:v,fecha:document.getElementById(`doc-fecha-${i}`)?.value||'',foto:_csDocFotos[i]})),
+    items,totalItems:items.filter(i=>!i.esSeccion).length,
+    fotos4lados:{der:null,izq:null,front:null,post:null},ts:new Date().toISOString()};
+  _csFotoSerie=null; _csDocFotos=[null,null,null,null]; _csDocVals=['','','',''];
+  renderChecklistForm();
+}
+
+let _fotos4lados={der:null,izq:null,front:null,post:null};
+function renderChecklistForm(){
+  const st=S.evalState; const eq=getEq(st.equipoCod);
+  const respondidos=st.items.filter(i=>!i.esSeccion&&i.estado).length;
+  const pct=Math.round(respondidos/st.totalItems*100);
+  document.getElementById('m-eval-t').textContent=`Checklist ${eq.codigo_interno}`;
+  const fotos4=_fotos4lados;
+  const fotosLados=[
+    {key:'front',label:'Frontal',icon:'ti-arrow-up'},
+    {key:'post',label:'Posterior',icon:'ti-arrow-down'},
+    {key:'der',label:'Lateral Derecha',icon:'ti-arrow-right'},
+    {key:'izq',label:'Lateral Izquierda',icon:'ti-arrow-left'},
+  ];
+  document.getElementById('m-eval-b').innerHTML=`
+    <div style="background:var(--bg3);border-radius:8px;padding:.55rem .65rem;margin-bottom:.65rem">
+      <div style="font-size:11px;color:var(--text2)">${eq.nombre} · ${st.origen} → ${st.destino}</div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;margin-top:.25rem">
+        <span>${respondidos}/${st.totalItems} ítems</span><span style="color:var(--acc)">${pct}%</span></div>
+      ${pbw(pct)}</div>
+
+    <!-- FOTOS 4 COSTADOS OBLIGATORIAS -->
+    <div class="shd"><i class="ti ti-camera" style="color:var(--danger)"></i> Fotos del Equipo (obligatorias)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.65rem">
+      ${fotosLados.map(f=>`<div class="pu ${fotos4[f.key]?'ok':''}" onclick="document.getElementById('fi-4-${f.key}').click()" style="padding:.5rem">
+        <input type="file" id="fi-4-${f.key}" accept="image/*" capture="environment" onchange="handleFoto4('${f.key}',this)">
+        <i class="ti ${fotos4[f.key]?'ti-photo-check':'ti-camera'}" style="font-size:18px;display:block;text-align:center;color:${fotos4[f.key]?'var(--acc3)':'var(--text3)'}"></i>
+        <div style="font-size:10px;text-align:center;color:${fotos4[f.key]?'var(--acc3)':'var(--text2)'};margin-top:.2rem">${f.label}${fotos4[f.key]?' ✓':''}</div>
+      </div>`).join('')}
+    </div>
+
+    <!-- ÍTEMS -->
+    ${st.items.map((item,i)=>{
+      if(item.esSeccion) return `<div style="background:var(--bg3);border-left:3px solid var(--acc2);padding:.4rem .65rem;margin:.65rem 0 .35rem;border-radius:0 6px 6px 0">
+        <span style="font-size:11px;font-weight:600;color:var(--acc2);text-transform:uppercase;letter-spacing:.5px">${item.name}</span></div>`;
+      const isNC=['R','M'].includes(item.estado);
+      return `<div class="ei" id="ei-${i}" style="${isNC?'border-color:rgba(239,68,68,.3)':''}">
+        <div class="er">
+          <span class="en" style="font-size:11px">${item.name}</span>
+          <div class="eo" style="gap:2px">
+            <button class="eb" onclick="setEI(${i},'B')" style="${item.estado==='B'?'background:rgba(59,130,246,.18);border-color:var(--acc2);color:var(--acc2)':''}">B</button>
+            <button class="eb" onclick="setEI(${i},'R')" style="${item.estado==='R'?'background:rgba(245,158,11,.18);border-color:var(--acc);color:var(--acc)':''}">R</button>
+            <button class="eb ${item.estado==='M'?'nc-on':''}" onclick="setEI(${i},'M')">M</button>
+            <button class="eb ${item.estado==='NA'?'na-on':''}" onclick="setEI(${i},'NA')" style="font-size:9px">NA</button>
+          </div>
+        </div>
+        ${isNC?`<div style="margin-top:.35rem">
+          <input class="fi" placeholder="Observación..." id="obs-${i}" value="${item.obs||''}"
+            oninput="S.evalState.items[${i}].obs=this.value" style="font-size:12px;margin-bottom:.25rem">
+          <div class="ncph ${item.foto?'up':''}" onclick="document.getElementById('ef-${i}').click()">
+            <input type="file" id="ef-${i}" accept="image/*" capture="environment" onchange="handleEF(${i},this)">
+            ${item.foto?'<i class="ti ti-photo-check"></i> Foto ✓':'<i class="ti ti-camera"></i> Foto requerida'}
+          </div></div>`:''}
+      </div>`;
+    }).join('')}
+    <div class="div"></div>
+    <button class="btn bw bfull" onclick="saveChecklist()">
+      <i class="ti ti-device-floppy"></i> Guardar Checklist</button>`;
+}
+
+function handleFoto4(key,inp){
+  if(!inp.files||!inp.files[0]) return;
+  const r=new FileReader(); r.onload=e=>{_fotos4lados[key]=e.target.result;renderChecklistForm();};
+  r.readAsDataURL(inp.files[0]);
+}
+
+async function saveChecklist(){
+  const st=S.evalState; const eq=getEq(st.equipoCod);
+  const f4=_fotos4lados;
+  if(!f4.front||!f4.post||!f4.der||!f4.izq){alert('Se requieren las 4 fotos del equipo (Frontal, Posterior, Lateral Derecha, Lateral Izquierda)');return;}
+  const realItems=st.items.filter(i=>!i.esSeccion);
+  const ncs=realItems.filter(i=>['R','M'].includes(i.estado));
+  const sinObs=ncs.filter(i=>!i.obs||i.obs.trim()==='');
+  if(sinObs.length){alert(`Falta observación en:\n${sinObs.map(i=>`• ${i.name}`).join('\n')}`);return;}
+  const idInsp='INSP-'+Date.now();
+  // Subir fotos 4 costados
+  const urlsFotos={};
+  for(const [key,b64] of Object.entries(f4)){
+    if(b64){
+      try{
+        const base64=b64.split(',')[1]; const mime=b64.split(',')[0].split(':')[1].split(';')[0];
+        const bytes=atob(base64); const arr=new Uint8Array(bytes.length);
+        for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+        const blob=new Blob([arr],{type:mime});
+        const file=new File([blob],`${key}.jpg`,{type:mime});
+        urlsFotos[key]=await supa.upload(`${eq.codigo_interno}/checklist/${idInsp}_${key}.jpg`,file);
+      }catch(e){console.warn(e);}
+    }
+  }
+  // Subir foto serie
+  let urlSerie=null;
+  if(st.fotoSerie){
+    try{
+      const base64=st.fotoSerie.split(',')[1]; const mime=st.fotoSerie.split(',')[0].split(':')[1].split(';')[0];
+      const bytes=atob(base64); const arr=new Uint8Array(bytes.length);
+      for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+      const blob=new Blob([arr],{type:mime});
+      const file=new File([blob],'serie.jpg',{type:mime});
+      urlSerie=await supa.upload(`${eq.codigo_interno}/checklist/${idInsp}_serie.jpg`,file);
+    }catch(e){console.warn(e);}
+  }
+  // Subir fotos NC
+  for(const item of ncs){
+    if(item.foto){
+      try{
+        const base64=item.foto.split(',')[1]; const mime=item.foto.split(',')[0].split(':')[1].split(';')[0];
+        const bytes=atob(base64); const arr=new Uint8Array(bytes.length);
+        for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+        const blob=new Blob([arr],{type:mime});
+        const file=new File([blob],'nc.jpg',{type:mime});
+        item.foto_url=await supa.upload(`${eq.codigo_interno}/checklist/${idInsp}_${item.name.replace(/\s+/g,'_').substring(0,20)}.jpg`,file);
+      }catch(e){console.warn(e);}
+    }
+  }
+  const conformes=realItems.filter(i=>i.estado==='B').length;
+  const insp={
+    id_inspeccion:idInsp,equipo_cod:st.equipoCod,sucursal:eq.sucursal||S.userSitio,
+    tipo_inspeccion:'Checklist Estándar',inspector:S.userName,
+    total_conformes:conformes,total_nc:ncs.length,
+    total_na:realItems.filter(i=>i.estado==='NA').length,
+    items_json:JSON.stringify({
+      datos:{origen:st.origen,destino:st.destino,horometro:st.horometro,combustible:st.combustible},
+      fotoSerie:urlSerie,
+      docs:st.docs.map((d,i)=>({nombre:['Revisión Técnica','Emisión de Gases','Seguro Obligatorio','Permiso de Circulación'][i],...d})),
+      fotos4lados:urlsFotos,
+      items:realItems.map(i=>({seccion:i.seccion,nombre:i.name,estado:i.estado,obs:i.obs||'',foto_url:i.foto_url||null}))
+    }),
+    fotos_nc_json:JSON.stringify(ncs.map(i=>({item:i.name,url:i.foto_url||null,obs:i.obs||''})))
+  };
+  try{
+    const res=await supa.post('inspecciones',insp);
+    S.inspecciones.unshift(res[0]);
+    _fotos4lados={der:null,izq:null,front:null,post:null};
+    cm('m-eval'); renderRole();
+    alert(`✓ Checklist guardado\n✓ ${conformes} OK · ✗ ${ncs.length} NC`);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── SUBTIPOS CAMIÓN ──
+function mostrarSubtiposCamion(){
+  document.getElementById('m-eval-t').textContent='Levantamiento Mecánico Camiones';
+  document.getElementById('m-eval-b').innerHTML=`
+    <div class="shd">Selecciona el tipo de camión</div>
+    ${SUBTIPOS_CAMION.map(tipo=>`
+      <div class="card" style="cursor:pointer;margin-bottom:.35rem" onclick="openEvalSel('${tipo}','Mecánico Camiones')">
+        <div style="display:flex;align-items:center;gap:.65rem">
+          <div style="width:36px;height:36px;border-radius:8px;background:rgba(245,158,11,.12);display:flex;align-items:center;justify-content:center;color:var(--acc)"><i class="ti ti-truck"></i></div>
+          <div><div class="ct">${tipo}</div>
+            <div class="cs">${S.plantillas.filter(p=>p.tipo_equipo===tipo).length} ítems</div></div>
+          <i class="ti ti-chevron-right" style="color:var(--text3);margin-left:auto"></i>
+        </div></div>`).join('')}`;
+  document.getElementById('m-eval').classList.remove('hidden');
+}
+
+// ── LEVANTAMIENTO NEUMÁTICOS ──
+let _neum={equipoCod:'',cantidad:0,neumaticos:[]};
+function iniciarLevantamientoNeumaticos(){
+  document.getElementById('m-eval-t').textContent='Levantamiento Neumáticos';
+  document.getElementById('m-eval-b').innerHTML=`
+    <div class="fg"><label class="fl">Equipo</label>
+      <select class="fs" id="ev-eq-neum">${visibleEquipos().map(e=>`<option value="${e.codigo_interno}">[${e.codigo_interno}] ${e.nombre}</option>`).join('')}</select></div>
+    <div class="fg"><label class="fl">¿Cuántos neumáticos tiene?</label>
+      <input class="fi" id="neum-cantidad" type="number" min="1" max="20" placeholder="Ej: 6, 8, 10, 12" style="font-family:var(--fm)"></div>
+    <button class="btn bp bfull" onclick="generarFormNeumaticos()">
+      <i class="ti ti-arrow-right"></i> Continuar</button>`;
+  document.getElementById('m-eval').classList.remove('hidden');
+}
+
+function generarFormNeumaticos(){
+  const cod=document.getElementById('ev-eq-neum').value;
+  const cant=parseInt(document.getElementById('neum-cantidad').value)||0;
+  if(!cant||cant<1){alert('Ingresa la cantidad de neumáticos');return;}
+  _neum={equipoCod:cod,cantidad:cant,neumaticos:Array.from({length:cant},(_,i)=>({pos:i+1,marca:'',modelo:'',medida:'',estado:null,exterior:null,interior:null,foto:null}))};
+  renderFormNeumaticos();
+}
+
+function renderFormNeumaticos(){
+  const eq=getEq(_neum.equipoCod);
+  const completados=_neum.neumaticos.filter(n=>n.estado&&n.foto).length;
+  document.getElementById('m-eval-t').textContent=`Neumáticos ${eq.codigo_interno}`;
+  document.getElementById('m-eval-b').innerHTML=`
+    <div style="background:var(--bg3);border-radius:8px;padding:.5rem .65rem;margin-bottom:.65rem">
+      <div style="font-size:11px;color:var(--text2)">${eq.nombre} · ${_neum.cantidad} neumáticos</div>
+      <div style="font-size:11px;color:var(--acc);margin-top:.15rem">${completados}/${_neum.cantidad} completados</div>
+      ${pbw(Math.round(completados/_neum.cantidad*100))}
+    </div>
+    ${_neum.neumaticos.map((n,i)=>`
+      <div class="card" style="margin-bottom:.5rem;border-color:${n.estado&&n.foto?'rgba(16,185,129,.3)':'var(--border)'}">
+        <div style="font-size:12px;font-weight:600;color:var(--acc2);margin-bottom:.4rem">
+          <i class="ti ti-circle"></i> Posición ${n.pos}
+          ${n.estado&&n.foto?'<span style="color:var(--acc3);float:right;font-size:10px">✓ Completo</span>':''}
+        </div>
+        <div class="r2" style="margin-bottom:.35rem">
+          <div class="fg"><label class="fl">Marca</label>
+            <input class="fi" value="${n.marca}" oninput="_neum.neumaticos[${i}].marca=this.value" placeholder="Michelin" style="font-size:13px"></div>
+          <div class="fg"><label class="fl">Modelo</label>
+            <input class="fi" value="${n.modelo}" oninput="_neum.neumaticos[${i}].modelo=this.value" placeholder="XZY" style="font-size:13px"></div>
+        </div>
+        <div class="fg" style="margin-bottom:.35rem"><label class="fl">Medida</label>
+          <input class="fi" value="${n.medida}" oninput="_neum.neumaticos[${i}].medida=this.value" placeholder="315/80R22.5" style="font-size:13px"></div>
+        <div style="display:flex;gap:.35rem;margin-bottom:.4rem;flex-wrap:wrap">
+          <div style="flex:1">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:.2rem;text-transform:uppercase">Estado General</div>
+            <div style="display:flex;gap:.25rem">
+              <button class="eb" onclick="_neum.neumaticos[${i}].estado='B';renderFormNeumaticos()"
+                style="${n.estado==='B'?'background:rgba(59,130,246,.18);border-color:var(--acc2);color:var(--acc2)':''}">B</button>
+              <button class="eb ${n.estado==='M'?'nc-on':''}" onclick="_neum.neumaticos[${i}].estado='M';renderFormNeumaticos()">M</button>
+            </div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:.2rem;text-transform:uppercase">Exterior</div>
+            <div style="display:flex;gap:.25rem">
+              <button class="eb" onclick="_neum.neumaticos[${i}].exterior='B';renderFormNeumaticos()"
+                style="${n.exterior==='B'?'background:rgba(59,130,246,.18);border-color:var(--acc2);color:var(--acc2)':''}">B</button>
+              <button class="eb ${n.exterior==='M'?'nc-on':''}" onclick="_neum.neumaticos[${i}].exterior='M';renderFormNeumaticos()">M</button>
+            </div>
+          </div>
+          <div style="flex:1">
+            <div style="font-size:10px;color:var(--text2);margin-bottom:.2rem;text-transform:uppercase">Interior</div>
+            <div style="display:flex;gap:.25rem">
+              <button class="eb" onclick="_neum.neumaticos[${i}].interior='B';renderFormNeumaticos()"
+                style="${n.interior==='B'?'background:rgba(59,130,246,.18);border-color:var(--acc2);color:var(--acc2)':''}">B</button>
+              <button class="eb ${n.interior==='M'?'nc-on':''}" onclick="_neum.neumaticos[${i}].interior='M';renderFormNeumaticos()">M</button>
+            </div>
+          </div>
+        </div>
+        <div class="pu ${n.foto?'ok':''}" onclick="document.getElementById('fi-neum-${i}').click()" style="padding:.45rem">
+          <input type="file" id="fi-neum-${i}" accept="image/*" capture="environment" onchange="handleFotoNeum(${i},this)">
+          <div style="text-align:center;font-size:11px;color:${n.foto?'var(--acc3)':'var(--text2)'}">
+            <i class="ti ti-${n.foto?'photo-check':'camera'}"></i> ${n.foto?'Foto ✓':'Foto obligatoria'}</div>
+        </div>
+      </div>`).join('')}
+    <div class="div"></div>
+    <div class="fg"><label class="fl">Observaciones generales</label>
+      <textarea class="fta" id="neum-obs" style="min-height:50px"></textarea></div>
+    <button class="btn bw bfull" onclick="saveNeumaticos()">
+      <i class="ti ti-device-floppy"></i> Guardar Levantamiento</button>`;
+}
+
+function handleFotoNeum(i,inp){
+  if(!inp.files||!inp.files[0]) return;
+  const r=new FileReader(); r.onload=e=>{_neum.neumaticos[i].foto=e.target.result;renderFormNeumaticos();};
+  r.readAsDataURL(inp.files[0]);
+}
+
+async function saveNeumaticos(){
+  const sinFoto=_neum.neumaticos.filter(n=>!n.foto);
+  if(sinFoto.length){alert(`Falta foto en posición(es): ${sinFoto.map(n=>n.pos).join(', ')}`);return;}
+  const sinEstado=_neum.neumaticos.filter(n=>!n.estado);
+  if(sinEstado.length){alert(`Falta estado en posición(es): ${sinEstado.map(n=>n.pos).join(', ')}`);return;}
+  const eq=getEq(_neum.equipoCod);
+  const idInsp='INSP-'+Date.now();
+  // Subir fotos
+  for(const n of _neum.neumaticos){
+    if(n.foto){
+      try{
+        const base64=n.foto.split(',')[1]; const mime=n.foto.split(',')[0].split(':')[1].split(';')[0];
+        const bytes=atob(base64); const arr=new Uint8Array(bytes.length);
+        for(let i=0;i<bytes.length;i++) arr[i]=bytes.charCodeAt(i);
+        const blob=new Blob([arr],{type:mime});
+        const file=new File([blob],`pos${n.pos}.jpg`,{type:mime});
+        n.foto_url=await supa.upload(`${eq.codigo_interno}/neumaticos/${idInsp}_pos${n.pos}.jpg`,file);
+      }catch(e){console.warn(e);}
+    }
+  }
+  const buenos=_neum.neumaticos.filter(n=>n.estado==='B').length;
+  const malos=_neum.neumaticos.filter(n=>n.estado==='M').length;
+  const obs=document.getElementById('neum-obs')?.value||'';
+  const insp={
+    id_inspeccion:idInsp,equipo_cod:_neum.equipoCod,sucursal:eq.sucursal||S.userSitio,
+    tipo_inspeccion:'Levantamiento Neumáticos',inspector:S.userName,
+    total_conformes:buenos,total_nc:malos,total_na:0,
+    items_json:JSON.stringify(_neum.neumaticos.map(n=>({...n,foto:null}))),
+    fotos_nc_json:JSON.stringify(_neum.neumaticos.filter(n=>n.estado==='M').map(n=>({item:`Pos ${n.pos}`,url:n.foto_url||null,obs:''})))
+  };
+  try{
+    const res=await supa.post('inspecciones',insp);
+    S.inspecciones.unshift(res[0]);
+    if(malos>0) addAlert('crit',`Neumáticos ${eq.nombre}`,`${malos} en mal estado`);
+    cm('m-eval'); renderRole();
+    alert(`✓ Levantamiento guardado\n${buenos} buenos · ${malos} malos`);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+// ── AT1 Y MECÁNICO CAMIONES ──
+function openEvalSel(tipoEq, tipoInsp){
+  const tipoPlantilla = tipoEq === 'Otro (usar plantilla Cargador Frontal)' ? 'Cargador Frontal' : tipoEq;
+  const etiqueta = tipoEq === 'Otro (usar plantilla Cargador Frontal)' ? 'Otro Equipo' : tipoEq;
+
+  // Mapeo exacto de tipos de inspección → tipos en Supabase
+  const mapAT1 = {
+    'Articulado Tolva': ['Articulado Tolva'],
+    'Bulldozer': ['Bulldozer'],
+    'Cargador Frontal': ['Cargador Frontal'],
+    'Excavadora': ['Excavadora','Retroexcavadora'],
+    'Motoniveladora': ['Motoniveladora'],
+  };
+  const mapCamiones = {
+    'Camión Tolva': ['Tolva','Rígido'],
+    'Camión Pluma': ['Pluma'],
+    'Camión Aljibe': ['Aljibe'],
+    'Camión Combustible': ['Combustible','Servicio'],
+    'Camión Mantención': ['Mantención','Lubricador'],
+  };
+
+  let eqList = visibleEquipos();
+  if(tipoInsp === 'AT1' && tipoEq !== 'Otro (usar plantilla Cargador Frontal)'){
+    const tiposValidos = mapAT1[tipoEq] || [];
+    if(tiposValidos.length) eqList = eqList.filter(e => tiposValidos.includes(e.tipo));
+  } else if(tipoInsp === 'Mecánico Camiones'){
+    const tiposValidos = mapCamiones[tipoEq] || [];
+    if(tiposValidos.length) eqList = eqList.filter(e => tiposValidos.includes(e.tipo));
+  }
+
+  const itemCount = S.plantillas.filter(p=>p.tipo_equipo===tipoPlantilla&&p.tipo_inspeccion===(tipoInsp||'AT1')).length;
+
+  document.getElementById('m-eval-t').textContent=`${tipoInsp==='AT1'?'AT1':'Mecánico'} — ${etiqueta}`;
+  document.getElementById('m-eval-b').innerHTML=`
+    <div style="font-size:11px;color:var(--acc2);background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:8px;padding:.5rem .65rem;margin-bottom:.65rem">
+      <i class="ti ti-info-circle"></i> ${tipoInsp} · ${itemCount} ítems
+      ${tipoEq==='Otro (usar plantilla Cargador Frontal)'?'<div style="margin-top:.25rem;color:var(--acc);font-size:10px"><i class="ti ti-alert-triangle"></i> Usando plantilla de Cargador Frontal como base</div>':''}
+    </div>
+    <div class="fg"><label class="fl">Equipo a inspeccionar ${eqList.length===0?'(no hay equipos de este tipo en tu sucursal)':''}</label>
+      <select class="fs" id="ev-eq">
+        ${eqList.length ? eqList.map(e=>`<option value="${e.codigo_interno}">[${e.codigo_interno}] ${e.nombre} — ${e.tipo}</option>`).join('') : '<option value="">Sin equipos disponibles</option>'}
+      </select></div>
+    <div class="fg"><label class="fl">Horómetro actual</label>
+      <input class="fi" id="ev-horometro" type="number" placeholder="Ej: 12450" style="font-family:var(--fm)"></div>
+    <button class="btn bp bfull" onclick="startEval('${tipoPlantilla}','${tipoInsp||'AT1'}','${etiqueta}')" ${eqList.length===0?'disabled':''}>
+      <i class="ti ti-clipboard-check"></i> Iniciar Inspección</button>`;
+  document.getElementById('m-eval').classList.remove('hidden');
+}
+
+function startEval(tipoEq, tipoInsp, etiqueta){
   const cod=document.getElementById('ev-eq').value;
   const horometro=document.getElementById('ev-horometro').value||'';
-  const plantillas=S.plantillas.filter(p=>p.tipo_equipo===tipoEq&&p.tipo_inspeccion==='AT1');
-  if(!plantillas.length){alert(`No hay plantilla AT1 para "${tipoEq}".`);return;}
+  const plantillas=S.plantillas.filter(p=>p.tipo_equipo===tipoEq&&p.tipo_inspeccion===(tipoInsp||'AT1'));
+  if(!plantillas.length){alert(`No hay plantilla para "${tipoEq}".`);return;}
   const secciones={};
-  plantillas.forEach(p=>{
-    const sec=p.seccion||'General';
-    if(!secciones[sec]) secciones[sec]=[];
-    secciones[sec].push({name:p.item_inspeccion,tipo_resp:p.tipo_respuesta||'BRM',estado:null,foto:null,obs:'',seccion:sec});
-  });
+  plantillas.forEach(p=>{const sec=p.seccion||'General';if(!secciones[sec])secciones[sec]=[];
+    secciones[sec].push({name:p.item_inspeccion,tipo_resp:'BRM',estado:null,foto:null,obs:'',seccion:sec});});
   const items=[];
-  Object.entries(secciones).forEach(([sec,its])=>{
-    items.push({esSeccion:true,name:sec});
-    its.forEach(it=>items.push(it));
-  });
-  S.evalState={tipoEq,equipoCod:cod,horometro,items,ts:new Date().toISOString(),
+  Object.entries(secciones).forEach(([sec,its])=>{items.push({esSeccion:true,name:sec});its.forEach(it=>items.push(it));});
+  S.evalState={tipoEq:etiqueta||tipoEq,tipoPlantilla:tipoEq,tipoInsp:tipoInsp||'AT1',equipoCod:cod,horometro,items,ts:new Date().toISOString(),
     totalItems:items.filter(i=>!i.esSeccion).length};
   renderEvalForm();
 }
@@ -1127,26 +1562,23 @@ function renderEvalForm(){
   const st=S.evalState; const eq=getEq(st.equipoCod);
   const respondidos=st.items.filter(i=>!i.esSeccion&&i.estado).length;
   const pct=Math.round(respondidos/st.totalItems*100);
-  const conf=st.items.filter(i=>!i.esSeccion&&['S','B'].includes(i.estado)).length;
-  const nc=st.items.filter(i=>!i.esSeccion&&['N','R','M'].includes(i.estado)).length;
+  const conf=st.items.filter(i=>!i.esSeccion&&i.estado==='B').length;
+  const nc=st.items.filter(i=>!i.esSeccion&&['R','M'].includes(i.estado)).length;
   const na=st.items.filter(i=>!i.esSeccion&&i.estado==='NA').length;
-  document.getElementById('m-eval-t').textContent=`AT1 ${eq.codigo_interno}`;
+  document.getElementById('m-eval-t').textContent=`${st.tipoInsp} ${eq.codigo_interno}`;
   document.getElementById('m-eval-b').innerHTML=`
     <div style="background:var(--bg3);border-radius:8px;padding:.55rem .65rem;margin-bottom:.65rem">
       <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:.3rem">
         <span style="color:var(--text2)">${eq.nombre} · ${st.tipoEq}</span>
-        <span style="font-family:var(--fm);color:var(--acc)">${respondidos}/${st.totalItems}</span>
-      </div>
+        <span style="font-family:var(--fm);color:var(--acc)">${respondidos}/${st.totalItems}</span></div>
       ${pbw(pct)}
       <div style="display:flex;gap:.5rem;margin-top:.3rem;font-size:10px">
-        <span style="color:var(--acc3)">${conf} conf.</span>
-        <span style="color:var(--danger)">${nc} NC</span>
-        <span style="color:#94a3b8">${na} N/A</span>
+        <span style="color:var(--acc3)">${conf}B</span>
+        <span style="color:var(--acc)">${nc}NC</span>
+        <span style="color:#94a3b8">${na}NA</span>
       </div>
     </div>
     <div style="display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:.65rem;font-size:10px">
-      <span style="background:rgba(16,185,129,.12);color:var(--acc3);padding:2px 7px;border-radius:5px;border:1px solid var(--acc3)">S=Sí</span>
-      <span style="background:rgba(239,68,68,.12);color:var(--danger);padding:2px 7px;border-radius:5px;border:1px solid var(--danger)">N=No</span>
       <span style="background:rgba(59,130,246,.12);color:var(--acc2);padding:2px 7px;border-radius:5px;border:1px solid var(--acc2)">B=Bueno</span>
       <span style="background:rgba(245,158,11,.12);color:var(--acc);padding:2px 7px;border-radius:5px;border:1px solid var(--acc)">R=Regular</span>
       <span style="background:rgba(239,68,68,.12);color:var(--danger);padding:2px 7px;border-radius:5px;border:1px solid var(--danger)">M=Malo</span>
@@ -1155,22 +1587,15 @@ function renderEvalForm(){
     ${st.items.map((item,i)=>{
       if(item.esSeccion) return `<div style="background:var(--bg3);border-left:3px solid var(--acc2);padding:.4rem .65rem;margin:.65rem 0 .35rem;border-radius:0 6px 6px 0">
         <span style="font-size:11px;font-weight:600;color:var(--acc2);text-transform:uppercase;letter-spacing:.5px">${item.name}</span></div>`;
-      const isSN=item.tipo_resp==='SN';
-      const isNC=['N','R','M'].includes(item.estado);
+      const isNC=['R','M'].includes(item.estado);
       return `<div class="ei" id="ei-${i}" style="${isNC?'border-color:rgba(239,68,68,.3)':''}">
         <div class="er">
           <span class="en" style="font-size:11px">${item.name}</span>
           <div class="eo" style="gap:2px">
-            ${isSN?`
-              <button class="eb ${item.estado==='S'?'ok-on':''}" onclick="setEI(${i},'S')">S</button>
-              <button class="eb ${item.estado==='N'?'nc-on':''}" onclick="setEI(${i},'N')">N</button>
-              <button class="eb ${item.estado==='NA'?'na-on':''}" onclick="setEI(${i},'NA')" style="font-size:9px">NA</button>
-            `:`
-              <button class="eb" onclick="setEI(${i},'B')" style="${item.estado==='B'?'background:rgba(59,130,246,.18);border-color:var(--acc2);color:var(--acc2)':''}">B</button>
-              <button class="eb" onclick="setEI(${i},'R')" style="${item.estado==='R'?'background:rgba(245,158,11,.18);border-color:var(--acc);color:var(--acc)':''}">R</button>
-              <button class="eb ${item.estado==='M'?'nc-on':''}" onclick="setEI(${i},'M')">M</button>
-              <button class="eb ${item.estado==='NA'?'na-on':''}" onclick="setEI(${i},'NA')" style="font-size:9px">NA</button>
-            `}
+            <button class="eb" onclick="setEI(${i},'B')" style="${item.estado==='B'?'background:rgba(59,130,246,.18);border-color:var(--acc2);color:var(--acc2)':''}">B</button>
+            <button class="eb" onclick="setEI(${i},'R')" style="${item.estado==='R'?'background:rgba(245,158,11,.18);border-color:var(--acc);color:var(--acc)':''}">R</button>
+            <button class="eb ${item.estado==='M'?'nc-on':''}" onclick="setEI(${i},'M')">M</button>
+            <button class="eb ${item.estado==='NA'?'na-on':''}" onclick="setEI(${i},'NA')" style="font-size:9px">NA</button>
           </div>
         </div>
         ${isNC?`<div style="margin-top:.35rem">
@@ -1178,23 +1603,22 @@ function renderEvalForm(){
             oninput="S.evalState.items[${i}].obs=this.value" style="font-size:12px;margin-bottom:.25rem">
           <div class="ncph ${item.foto?'up':''}" onclick="document.getElementById('ef-${i}').click()">
             <input type="file" id="ef-${i}" accept="image/*" capture="environment" onchange="handleEF(${i},this)">
-            ${item.foto?`<i class="ti ti-photo-check"></i> Foto ✓`:`<i class="ti ti-camera"></i> Foto requerida`}
+            ${item.foto?'<i class="ti ti-photo-check"></i> Foto ✓':'<i class="ti ti-camera"></i> Foto requerida'}
           </div></div>`:''}
       </div>`;
     }).join('')}
     <div class="div"></div>
-    <div style="font-size:11px;color:var(--text2);margin-bottom:.5rem;text-align:center">
-      ${respondidos}/${st.totalItems} respondidos${respondidos<st.totalItems?` · <span style="color:var(--warn)">Faltan ${st.totalItems-respondidos}</span>`:''}
-    </div>
     <button class="btn bw bfull" onclick="saveEval()" ${respondidos===0?'disabled':''}>
-      <i class="ti ti-device-floppy"></i> Guardar Inspección AT1</button>`;
+      <i class="ti ti-device-floppy"></i> Guardar Inspección</button>`;
 }
 
 function setEI(i,v){
-  S.evalState.items[i].estado=v;
-  if(!['N','R','M'].includes(v)){S.evalState.items[i].foto=null;S.evalState.items[i].obs='';}
-  renderEvalForm();
-  setTimeout(()=>{const el=document.getElementById(`ei-${i}`);if(el)el.scrollIntoView({block:'nearest'});},50);
+  if(S.evalState&&S.evalState.items&&S.evalState.items[i]){
+    S.evalState.items[i].estado=v;
+    if(!['R','M'].includes(v)){S.evalState.items[i].foto=null;S.evalState.items[i].obs='';}
+    renderEvalForm();
+    setTimeout(()=>{const el=document.getElementById(`ei-${i}`);if(el)el.scrollIntoView({block:'nearest'});},50);
+  }
 }
 function handleEF(i,inp){
   if(!inp.files||!inp.files[0]) return;
@@ -1206,169 +1630,44 @@ function handleEF(i,inp){
 async function saveEval(){
   const st=S.evalState; const eq=getEq(st.equipoCod);
   const realItems=st.items.filter(i=>!i.esSeccion);
-  const ncs=realItems.filter(i=>['N','R','M'].includes(i.estado));
+  const ncs=realItems.filter(i=>['R','M'].includes(i.estado));
   const sinObs=ncs.filter(i=>!i.obs||i.obs.trim()==='');
   if(sinObs.length){alert(`Falta observación en:\n${sinObs.map(i=>`• ${i.name}`).join('\n')}`);return;}
   const sinFoto=ncs.filter(i=>!i.foto);
   if(sinFoto.length){alert(`Falta foto en:\n${sinFoto.map(i=>`• ${i.name}`).join('\n')}`);return;}
   const idInsp='INSP-'+Date.now();
-  // Subir fotos NC
   for(const item of ncs){
     if(item.foto){
       try{
-        const blob=await(await fetch(item.foto)).blob();
-        const file=new File([blob],'nc.jpg',{type:'image/jpeg'});
-        const path=`${eq.codigo_interno}/inspecciones/${idInsp}_${item.name.replace(/\s+/g,'_').substring(0,30)}.jpg`;
+        const base64=item.foto.split(',')[1]; const mime=item.foto.split(',')[0].split(':')[1].split(';')[0];
+        const bytes=atob(base64); const arr=new Uint8Array(bytes.length);
+        for(let k=0;k<bytes.length;k++) arr[k]=bytes.charCodeAt(k);
+        const blob=new Blob([arr],{type:mime});
+        const file=new File([blob],'nc.jpg',{type:mime});
+        const path=`${eq.codigo_interno}/inspecciones/${idInsp}_${item.name.replace(/\s+/g,'_').substring(0,25)}.jpg`;
         item.foto_url=await supa.upload(path,file);
       }catch(e){console.warn(e);}
     }
   }
-  const conformes=realItems.filter(i=>['S','B'].includes(i.estado)).length;
+  const conformes=realItems.filter(i=>i.estado==='B').length;
   const inspData={
     id_inspeccion:idInsp,equipo_cod:st.equipoCod,sucursal:eq.sucursal||S.userSitio,
-    tipo_inspeccion:`AT1 ${st.tipoEq}`,inspector:S.userName,
+    tipo_inspeccion:`${st.tipoInsp} ${st.tipoEq}`,inspector:S.userName,
     total_conformes:conformes,total_nc:ncs.length,
     total_na:realItems.filter(i=>i.estado==='NA').length,
-    items_json:JSON.stringify(realItems.map(i=>({seccion:i.seccion,nombre:i.name,tipo_resp:i.tipo_resp,estado:i.estado,obs:i.obs||'',foto_url:i.foto_url||null}))),
+    items_json:JSON.stringify(realItems.map(i=>({seccion:i.seccion,nombre:i.name,estado:i.estado,obs:i.obs||'',foto_url:i.foto_url||null}))),
     fotos_nc_json:JSON.stringify(ncs.map(i=>({item:i.name,url:i.foto_url||null,obs:i.obs||''})))
   };
   try{
     const res=await supa.post('inspecciones',inspData);
     S.inspecciones.unshift(res[0]);
-    if(ncs.length>0) addAlert('crit',`AT1 ${eq.nombre}`,`${ncs.length} no conforme(s)`);
-    // Generar y subir PDF
-    await generarPDFInspeccion(idInsp, eq, st, realItems, ncs, inspData);
+    if(ncs.length>0) addAlert('crit',`${st.tipoInsp} ${eq.nombre}`,`${ncs.length} no conforme(s)`);
+    await generarPDFInspeccion(idInsp,eq,st,realItems,ncs,inspData);
     cm('m-eval'); renderRole();
-    alert(`✓ AT1 guardada y PDF generado\n✓ ${conformes} conformes · ✗ ${ncs.length} NC · ${inspData.total_na} N/A`);
+    alert(`✓ Inspección guardada\n✓ ${conformes} Bueno · ✗ ${ncs.length} NC · ${inspData.total_na} NA`);
   }catch(e){alert('Error: '+e.message);}
 }
 
-async function generarPDFInspeccion(idInsp, eq, st, realItems, ncs, inspData){
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({unit:'mm',format:'a4'});
-  const W=210; const M=15;
-  let y=M;
-  const hoy=new Date().toLocaleString('es-CL');
-
-  // ── Header ──
-  doc.setFillColor(30,36,56); doc.rect(0,0,W,32,'F');
-  doc.setTextColor(255,255,255);
-  doc.setFontSize(18); doc.setFont(undefined,'bold');
-  doc.text('MechOT',M,13);
-  doc.setFontSize(11); doc.setFont(undefined,'normal');
-  doc.text('Informe de Inspección Técnica AT1',M,22);
-  doc.setFontSize(9);
-  doc.text(`Generado: ${hoy}`,W-M,22,{align:'right'});
-  y=40;
-
-  // ── Info equipo ──
-  doc.setFillColor(245,246,250); doc.rect(M,y-4,W-M*2,28,'F');
-  doc.setTextColor(30,36,56); doc.setFontSize(14); doc.setFont(undefined,'bold');
-  doc.text(`${eq.nombre}`,M+3,y+4);
-  doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(80,80,80);
-  doc.text(`Código: ${eq.codigo_interno}  ·  Tipo: ${st.tipoEq}  ·  Sucursal: ${eq.sucursal}`,M+3,y+11);
-  doc.text(`Marca: ${eq.marca||'—'}  ·  Modelo: ${eq.modelo||'—'}`,M+3,y+17);
-  doc.text(`Inspector: ${inspData.inspector}  ·  Fecha: ${hoy}  ·  ID: ${idInsp}`,M+3,y+23);
-  y+=36;
-
-  // ── Resumen ──
-  const conformes=realItems.filter(i=>['S','B'].includes(i.estado)).length;
-  const pctConf=realItems.length?Math.round(conformes/realItems.length*100):0;
-  doc.setFillColor(22,27,39); doc.rect(M,y,W-M*2,16,'F');
-  doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont(undefined,'bold');
-  doc.text(`Resumen: ${conformes} Conformes  ·  ${ncs.length} No Conformes  ·  ${inspData.total_na} N/A  ·  ${pctConf}% de cumplimiento`,M+3,y+6);
-  // Barra progreso
-  doc.setFillColor(42,48,72); doc.rect(M,y+9,W-M*2,4,'F');
-  doc.setFillColor(16,185,129); doc.rect(M,y+9,(W-M*2)*pctConf/100,4,'F');
-  y+=26;
-
-  // ── NO CONFORMES (primero) ──
-  if(ncs.length>0){
-    doc.setTextColor(192,0,0); doc.setFontSize(12); doc.setFont(undefined,'bold');
-    doc.text(`No Conformes (${ncs.length})`,M,y); y+=6;
-    for(const item of ncs){
-      if(y>260){doc.addPage();y=M;}
-      doc.setFillColor(255,231,231); doc.rect(M,y-3,W-M*2,20,'F');
-      doc.setDrawColor(192,0,0); doc.rect(M,y-3,W-M*2,20,'S');
-      doc.setTextColor(192,0,0); doc.setFontSize(10); doc.setFont(undefined,'bold');
-      doc.text(`[${item.estado}] ${item.name}`,M+2,y+3);
-      doc.setTextColor(80,80,80); doc.setFont(undefined,'normal'); doc.setFontSize(9);
-      if(item.seccion) doc.text(`Sección: ${item.seccion}`,M+2,y+8);
-      if(item.obs) doc.text(`Observación: ${item.obs}`,M+2,y+13);
-      if(item.foto_url){
-        doc.setTextColor(59,130,246);
-        doc.text(`Foto: ${item.foto_url}`,M+2,y+18);
-      }
-      y+=24;
-    }
-    y+=4;
-  }
-
-  // ── TODOS LOS ÍTEMS agrupados por sección ──
-  const secciones=[...new Set(realItems.map(i=>i.seccion||'General'))];
-  doc.setTextColor(30,36,56); doc.setFontSize(12); doc.setFont(undefined,'bold');
-  doc.text('Detalle Completo de Inspección',M,y); y+=7;
-
-  for(const sec of secciones){
-    if(y>270){doc.addPage();y=M;}
-    // Encabezado sección
-    doc.setFillColor(46,117,182); doc.rect(M,y-3,W-M*2,8,'F');
-    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont(undefined,'bold');
-    doc.text(sec.toUpperCase(),M+2,y+1);
-    y+=9;
-
-    const secItems=realItems.filter(i=>(i.seccion||'General')===sec);
-    for(const item of secItems){
-      if(y>275){doc.addPage();y=M;}
-      const isNC=['N','R','M'].includes(item.estado);
-      const isOK=['S','B'].includes(item.estado);
-      // Color fondo según resultado
-      if(isNC){doc.setFillColor(255,231,231);}
-      else if(isOK){doc.setFillColor(226,239,218);}
-      else{doc.setFillColor(242,242,242);}
-      doc.rect(M,y-1,W-M*2,7,'F');
-      // Texto ítem
-      doc.setTextColor(isNC?192:isOK?55:100, isNC?0:isOK?86:100, isNC?0:isOK?35:100);
-      doc.setFontSize(8); doc.setFont(undefined,isNC?'bold':'normal');
-      const nombreCorto=item.name.length>70?item.name.substring(0,67)+'...':item.name;
-      doc.text(nombreCorto,M+2,y+3);
-      // Estado alineado a la derecha
-      doc.setFont(undefined,'bold');
-      const estadoTxt=item.estado||'—';
-      doc.text(estadoTxt,W-M-3,y+3,{align:'right'});
-      // Observación si NC
-      if(isNC&&item.obs){
-        y+=7;
-        if(y>275){doc.addPage();y=M;}
-        doc.setFillColor(255,240,240); doc.rect(M+4,y-1,W-M*2-4,5,'F');
-        doc.setTextColor(150,0,0); doc.setFont(undefined,'italic'); doc.setFontSize(7);
-        const obsCorta=item.obs.length>90?item.obs.substring(0,87)+'...':item.obs;
-        doc.text(`  → ${obsCorta}`,M+4,y+2);
-      }
-      y+=7;
-    }
-    y+=3;
-  }
-
-  // ── Footer ──
-  const pageCount=doc.internal.getNumberOfPages();
-  for(let p=1;p<=pageCount;p++){
-    doc.setPage(p);
-    doc.setFillColor(30,36,56); doc.rect(0,285,W,12,'F');
-    doc.setTextColor(150,150,180); doc.setFontSize(7); doc.setFont(undefined,'normal');
-    doc.text(`MechOT · ${idInsp} · ${eq.nombre} · ${eq.codigo_interno}`,M,292);
-    doc.text(`Pág. ${p}/${pageCount}`,W-M,292,{align:'right'});
-  }
-
-  // Subir PDF a Supabase Storage
-  try{
-    const pdfBlob=doc.output('blob');
-    const pdfFile=new File([pdfBlob],'inspeccion.pdf',{type:'application/pdf'});
-    const fechaStr=new Date().toISOString().split('T')[0];
-    const pdfPath=`${eq.codigo_interno}/inspecciones/${idInsp}_AT1_${st.tipoEq.replace(/\s+/g,'_')}_${fechaStr}.pdf`;
-    await supa.upload(pdfPath, pdfFile);
-  }catch(e){console.warn('Error subiendo PDF inspección:',e);}
-}
 
 async function verInspeccion(id){
   const insp=S.inspecciones.find(i=>i.id_inspeccion===id);
@@ -1490,7 +1789,8 @@ function renderJefe(){
 const EQ_ESTADO = {
   'En Proceso':  {cls:'b-run', col:'var(--acc2)',  bg:'rgba(59,130,246,.12)'},
   'Disponible':  {cls:'b-don', col:'var(--acc3)',  bg:'rgba(16,185,129,.12)'},
-  'Entregado':   {cls:'b-pen', col:'#fcd34d',      bg:'rgba(245,158,11,.12)'},
+  'En Ruta':     {cls:'b-pen', col:'#fcd34d',      bg:'rgba(245,158,11,.12)'},
+  'Entregado':   {cls:'b-new', col:'#c4b5fd',      bg:'rgba(139,92,246,.12)'},
 };
 const eqEstadoBadge = est => {
   const c=EQ_ESTADO[est]||EQ_ESTADO['En Proceso'];
@@ -1809,29 +2109,33 @@ function openEqDetail(cod){
     ${['admin','jefe','supervisor'].includes(S.role)?`<div class="card" style="margin-bottom:.65rem">
       <div class="ct" style="margin-bottom:.5rem"><i class="ti ti-settings" style="color:var(--acc4)"></i> ${S.role==='admin'?'Configuración del Equipo':'Estado del Equipo'}</div>
       <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.3rem">Estado</div>
-      ${est!=='Disponible'&&activas.filter(o=>!['finalizada'].includes(o.estado)).length>0&&'Disponible'!==est?
-        `<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:.5rem .65rem;margin-bottom:.5rem;font-size:11px;color:var(--acc)">
-          <i class="ti ti-alert-triangle"></i> Para marcar como <b>Disponible</b> debes cerrar primero las ${activas.filter(o=>!['finalizada'].includes(o.estado)).length} OT(s) activa(s)
-        </div>`:``}
+      ${(()=>{const activas=S.ots.filter(o=>o.equipo_cod===cod&&!['finalizada'].includes(o.estado));
+        const bloqueado=activas.length>0&&est!=='Disponible'&&est!=='En Ruta'&&est!=='Entregado';
+        return bloqueado?`<div style="background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:.5rem .65rem;margin-bottom:.5rem;font-size:11px;color:var(--acc)">
+          <i class="ti ti-alert-triangle"></i> Cierra las ${activas.length} OT(s) activa(s) para marcar como Disponible</div>`:'';
+      })()}
       <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:${S.role==='admin'?'.65rem':'.2rem'}">
-        <button class="btn bsm ${est==='En Proceso'?'bs':''}" style="${est==='En Proceso'?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
-          onclick="cambiarEstadoEquipo('${cod}','En Proceso')"><i class="ti ti-tool"></i> En Proceso</button>
-        <button class="btn bsm ${est==='Disponible'?'bs':''}"
-          style="${est==='Disponible'?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
-          onclick="intentarDisponible('${cod}')"
-          ${activas.filter(o=>!['finalizada'].includes(o.estado)).length>0&&est!=='Disponible'?'disabled':''}>
-          <i class="ti ti-circle-check"></i> Disponible
-        </button>
-        ${S.role==='admin'?`<button class="btn bsm ${est==='Entregado'?'bs':''}" style="${est==='Entregado'?'':'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
-          onclick="cambiarEstadoEquipo('${cod}','Entregado')"><i class="ti ti-truck"></i> Entregado</button>`:''}
+        ${['En Proceso','Disponible','En Ruta','Entregado'].map(s=>{
+          const cfg=EQ_ESTADO[s];
+          const esDisponible=s==='Disponible';
+          const activas=S.ots.filter(o=>o.equipo_cod===cod&&!['finalizada'].includes(o.estado));
+          const bloqueado=esDisponible&&activas.length>0&&est!=='Disponible';
+          return `<button class="btn bsm" 
+            style="${est===s?`background:${cfg.bg};color:${cfg.col};border:1px solid ${cfg.col}`:'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
+            onclick="${esDisponible?`intentarDisponible('${cod}')`:`cambiarEstadoEquipo('${cod}','${s}')`}"
+            ${bloqueado?'disabled':''}>
+            <i class="ti ti-${s==='En Proceso'?'tool':s==='Disponible'?'circle-check':s==='En Ruta'?'truck':'flag'}"></i> ${s}
+          </button>`;
+        }).join('')}
       </div>
-      ${est==='Disponible'?`<div style="margin-top:.4rem;font-size:11px;color:var(--acc3);background:rgba(16,185,129,.08);border-radius:6px;padding:.4rem .6rem"><i class="ti ti-info-circle"></i> Equipo listo para entrega — pendiente despacho</div>`:''}
-      ${S.role==='admin'?`
+      ${est==='Disponible'?`<div style="margin-top:.4rem;font-size:11px;color:var(--acc3);background:rgba(16,185,129,.08);border-radius:6px;padding:.4rem .6rem"><i class="ti ti-info-circle"></i> Listo para despacho — pendiente salida</div>`:''}
+      ${est==='En Ruta'?`<div style="margin-top:.4rem;font-size:11px;color:#fcd34d;background:rgba(245,158,11,.08);border-radius:6px;padding:.4rem .6rem"><i class="ti ti-truck"></i> En tránsito hacia faena</div>`:''}
+      ${est==='Entregado'?`<div style="margin-top:.4rem;font-size:11px;color:#c4b5fd;background:rgba(139,92,246,.08);border-radius:6px;padding:.4rem .6rem"><i class="ti ti-flag"></i> Entregado en faena</div>`:''}
       <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-top:.65rem;margin-bottom:.3rem">Área</div>
       <div style="display:flex;gap:.4rem;flex-wrap:wrap">
         ${AREAS.map(a=>`<button class="btn bsm" style="${(e.area||'Habilitación')===a?`background:${AREA_CFG[a]?.bg};color:${AREA_CFG[a]?.col};border:1px solid ${AREA_CFG[a]?.col}`:'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'}"
           onclick="cambiarAreaEquipo('${cod}','${a}')"><i class="ti ${AREA_CFG[a]?.icon}"></i> ${a}</button>`).join('')}
-      </div>`:''}
+      </div>
     </div>`:''}
 
     <div class="sg">
@@ -1903,10 +2207,10 @@ async function intentarDisponible(cod){
 function renderCalendario(tc){
   const hoy=today();
   const esSuper=S.role==='supervisor';
-  const meses=esSuper?1:2; // supervisor ve ~3 semanas (1 mes), resto 2 meses
-  const coms=visibleCompromisos().filter(c=>c.estado!=='Entregado');
+  const meses=esSuper?1:2;
+  const coms=visibleCompromisos();
 
-  // Agrupar compromisos por fecha
+  // Agrupar por fecha
   const porFecha={};
   coms.forEach(c=>{
     if(!c.fecha_limite) return;
@@ -1914,21 +2218,22 @@ function renderCalendario(tc){
     porFecha[c.fecha_limite].push(c);
   });
 
-  let html='<div id="cal-sel" style="display:none"></div>';
+  let html='';
 
-  // Generar meses
-  const ahora=new Date(hoy+'T12:00:00');
   for(let m=0;m<meses;m++){
+    const ahora=new Date(hoy+'T12:00:00');
     const mesDate=new Date(ahora.getFullYear(), ahora.getMonth()+m, 1);
     const mesNom=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][mesDate.getMonth()];
     const anio=mesDate.getFullYear();
     const diasMes=new Date(anio,mesDate.getMonth()+1,0).getDate();
-    const primerDia=(mesDate.getDay()+6)%7; // 0=Lunes
+    const primerDia=(mesDate.getDay()+6)%7;
+    const mesStr=`${anio}-${String(mesDate.getMonth()+1).padStart(2,'0')}`;
+    const comsMes=coms.filter(c=>c.fecha_limite&&c.fecha_limite.startsWith(mesStr));
 
     html+=`<div class="card" style="margin-bottom:.65rem">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem">
         <div style="font-weight:600;font-size:14px">${mesNom} ${anio}</div>
-        <div style="font-size:11px;color:var(--text2)">${coms.filter(c=>c.fecha_limite&&c.fecha_limite.startsWith(`${anio}-${String(mesDate.getMonth()+1).padStart(2,'0')}`)).length} compromisos</div>
+        <div style="font-size:11px;color:var(--text2)">${comsMes.length} compromisos</div>
       </div>
       <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:.3rem">
         ${['L','M','X','J','V','S','D'].map(d=>`<div style="text-align:center;font-size:9px;color:var(--text3);font-weight:600;padding:.2rem 0">${d}</div>`).join('')}
@@ -1941,40 +2246,55 @@ function renderCalendario(tc){
           const comsDia=porFecha[fecha]||[];
           const esHoy=fecha===hoy;
           const esPasado=fecha<hoy;
-          const vencidos=comsDia.filter(c=>esPasado).length;
+          // Solo contar pendientes (no Entregado ni En Ruta)
+          const pendientes=comsDia.filter(c=>c.estado!=='Entregado');
+          const entregados=comsDia.filter(c=>c.estado==='Entregado');
+          const hayPendientes=pendientes.length>0;
+
           let bg='transparent', col=esPasado?'var(--text3)':'var(--text)', border='transparent';
           if(esHoy){bg='var(--acc2)';col='#fff';border='var(--acc2)';}
           else if(comsDia.length>0){
-            if(esPasado){bg='rgba(239,68,68,.15)';col='var(--danger)';border='rgba(239,68,68,.3)';}
-            else if(comsDia.length>=3){bg='rgba(245,158,11,.15)';col='var(--acc)';border='rgba(245,158,11,.3)';}
-            else{bg='rgba(16,185,129,.12)';col='var(--acc3)';border='rgba(16,185,129,.3)';}
+            if(esPasado&&hayPendientes){
+              // Pasado con pendientes → rojo
+              bg='rgba(239,68,68,.15)';col='var(--danger)';border='rgba(239,68,68,.3)';
+            } else if(esPasado&&!hayPendientes){
+              // Pasado todos entregados → verde
+              bg='rgba(16,185,129,.1)';col='var(--acc3)';border='rgba(16,185,129,.25)';
+            } else {
+              // Futuro con compromisos → azul/amarillo
+              bg=pendientes.length>=3?'rgba(245,158,11,.12)':'rgba(59,130,246,.1)';
+              col=pendientes.length>=3?'var(--acc)':'var(--acc2)';
+              border=pendientes.length>=3?'rgba(245,158,11,.3)':'rgba(59,130,246,.25)';
+            }
           }
-          return `<div onclick="verDiaCompromisos('${fecha}')" style="text-align:center;padding:.3rem .1rem;border-radius:6px;cursor:${comsDia.length>0?'pointer':'default'};background:${bg};border:1px solid ${border}">
+          return `<div onclick="${comsDia.length?`verDiaCompromisos('${fecha}')`:''}" 
+            style="text-align:center;padding:.3rem .1rem;border-radius:6px;cursor:${comsDia.length?'pointer':'default'};background:${bg};border:1px solid ${border}">
             <div style="font-size:12px;font-weight:${esHoy||comsDia.length?'600':'400'};color:${col}">${d}</div>
-            ${comsDia.length?`<div style="font-size:8px;color:${col};font-family:var(--fm)">${comsDia.length}</div>`:''}
+            ${comsDia.length?`<div style="font-size:8px;color:${col};font-family:var(--fm)">${hayPendientes?pendientes.length+'⏳':entregados.length+'✓'}</div>`:''}
           </div>`;
         }).join('')}
       </div>
     </div>`;
   }
 
-  // Próximas entregas como lista
-  const proximas=coms.filter(c=>c.fecha_limite>=hoy).sort((a,b)=>a.fecha_limite.localeCompare(b.fecha_limite)).slice(0,10);
-  const atrasadas=coms.filter(c=>c.fecha_limite<hoy).sort((a,b)=>b.fecha_limite.localeCompare(a.fecha_limite));
+  // Lista de vencidos con pendientes
+  const vencidos=coms.filter(c=>c.fecha_limite<hoy&&c.estado!=='Entregado').sort((a,b)=>a.fecha_limite.localeCompare(b.fecha_limite));
+  const proximas=coms.filter(c=>c.fecha_limite>=hoy&&c.estado!=='Entregado').sort((a,b)=>a.fecha_limite.localeCompare(b.fecha_limite)).slice(0,10);
 
-  html+=`${atrasadas.length?`<div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Atrasados (${atrasadas.length})</div>
-    ${atrasadas.map(c=>{
+  html+=`
+    ${vencidos.length?`<div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Pendientes vencidos (${vencidos.length})</div>
+    ${vencidos.map(c=>{
       const eq=getEq(c.equipo_cod);
       const diff=Math.abs(Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)));
       return `<div class="card" style="border-color:rgba(239,68,68,.3);margin-bottom:.4rem;padding:.6rem .75rem">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div><div style="font-size:12px;font-weight:500">${eq.nombre}</div>
-            <div style="font-size:10px;color:var(--text2)">${c.destino_envio}</div></div>
+            <div style="font-size:10px;color:var(--text2)">${c.destino_envio} · ${eqEstadoBadge(eq.estado_equipo||'En Proceso')}</div></div>
           <div style="text-align:right"><div style="font-size:11px;color:var(--danger);font-weight:600">${diff}d atraso</div>
             <div style="font-size:10px;color:var(--text3);font-family:var(--fm)">${fmtDate(c.fecha_limite)}</div></div>
         </div></div>`;
     }).join('')}`:''}
-  ${proximas.length?`<div class="shd"><i class="ti ti-calendar-event" style="color:var(--acc2)"></i> Próximas entregas</div>
+    ${proximas.length?`<div class="shd"><i class="ti ti-calendar-event" style="color:var(--acc2)"></i> Próximas entregas pendientes</div>
     ${proximas.map(c=>{
       const eq=getEq(c.equipo_cod);
       const diff=Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000));
@@ -1982,7 +2302,7 @@ function renderCalendario(tc){
       return `<div class="card" style="margin-bottom:.4rem;padding:.6rem .75rem">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div><div style="font-size:12px;font-weight:500">${eq.nombre}</div>
-            <div style="font-size:10px;color:var(--text2)">${c.destino_envio}</div></div>
+            <div style="font-size:10px;color:var(--text2)">${c.destino_envio} · ${eqEstadoBadge(eq.estado_equipo||'En Proceso')}</div></div>
           <div style="text-align:right"><div style="font-size:11px;color:${col};font-weight:600">${diff===0?'HOY':diff+'d'}</div>
             <div style="font-size:10px;color:var(--text3);font-family:var(--fm)">${fmtDate(c.fecha_limite)}</div></div>
         </div></div>`;
@@ -1990,6 +2310,46 @@ function renderCalendario(tc){
 
   tc.innerHTML=html;
 }
+
+function verDiaCompromisos(fecha){
+  const coms=visibleCompromisos().filter(c=>c.fecha_limite===fecha);
+  if(!coms.length) return;
+  const hoy=today();
+  const esPasado=fecha<hoy;
+  const pendientes=coms.filter(c=>c.estado!=='Entregado');
+  const entregados=coms.filter(c=>c.estado==='Entregado');
+
+  document.getElementById('m-com-t').textContent=`Compromisos ${fmtDate(fecha)}`;
+  document.getElementById('m-com-b').innerHTML=`
+    <div style="display:flex;gap:.4rem;margin-bottom:.65rem">
+      <div class="sc" style="flex:1"><div class="sv" style="color:var(--danger);font-size:18px">${pendientes.length}</div><div class="sl">Pendientes</div></div>
+      <div class="sc" style="flex:1"><div class="sv" style="color:var(--acc3);font-size:18px">${entregados.length}</div><div class="sl">Entregados</div></div>
+    </div>
+    ${pendientes.length?`<div class="shd"><i class="ti ti-clock" style="color:var(--danger)"></i> Pendientes (${pendientes.length})</div>
+    ${pendientes.map(c=>{
+      const eq=getEq(c.equipo_cod);
+      return `<div class="card" style="border-color:rgba(239,68,68,.3);margin-bottom:.4rem">
+        <div style="font-weight:500;font-size:13px">${eq.nombre}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:.15rem">${eq.codigo_interno} · ${eq.sucursal}</div>
+        <div style="display:flex;gap:.35rem;margin-top:.25rem;flex-wrap:wrap;align-items:center">
+          ${eqEstadoBadge(eq.estado_equipo||'En Proceso')} ${areaBadge(eq.area)}
+        </div>
+        <div style="font-size:11px;color:var(--text2);margin-top:.2rem"><i class="ti ti-map-pin"></i> ${c.destino_envio}</div>
+      </div>`;
+    }).join('')}`:''}
+    ${entregados.length?`<div class="shd"><i class="ti ti-circle-check" style="color:var(--acc3)"></i> Entregados (${entregados.length})</div>
+    ${entregados.map(c=>{
+      const eq=getEq(c.equipo_cod);
+      return `<div class="card" style="border-color:rgba(16,185,129,.25);margin-bottom:.4rem">
+        <div style="font-weight:500;font-size:13px">${eq.nombre}</div>
+        <div style="font-size:11px;color:var(--text2);margin-top:.15rem">${eq.codigo_interno} · ${eq.sucursal}</div>
+        <div style="font-size:11px;color:var(--acc3);margin-top:.2rem"><i class="ti ti-check"></i> Entregado · ${fmtDate(c.fecha_entrega_real||fecha)}</div>
+        <div style="font-size:11px;color:var(--text2)"><i class="ti ti-map-pin"></i> ${c.destino_envio}</div>
+      </div>`;
+    }).join('')}`:''}`;
+  document.getElementById('m-com').classList.remove('hidden');
+}
+
 
 function verDiaCompromisos(fecha){
   const coms=visibleCompromisos().filter(c=>c.fecha_limite===fecha&&c.estado!=='Entregado');
