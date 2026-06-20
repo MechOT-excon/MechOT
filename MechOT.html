@@ -1091,8 +1091,14 @@ async function finOT(id_ot){
   if(!o.foto_cierre_url){alert('Requiere foto de cierre');return;}
   const tareas=JSON.parse(o.tareas_json||'[]');
   const allCheck=tareas.map(t=>({...t,check:true}));
-  await supa.patch('ots',`id_ot=eq.${id_ot}`,{estado:'finalizada',avance_pct:100,tareas_json:JSON.stringify(allCheck),horas_ejecutadas:o.horas_programadas});
-  o.estado='finalizada'; o.avance_pct=100; o.tareas_json=JSON.stringify(allCheck); o.horas_ejecutadas=o.horas_programadas;
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{
+    estado:'finalizada',avance_pct:100,
+    tareas_json:JSON.stringify(allCheck),
+    horas_ejecutadas:horasTotales||o.horas_ejecutadas||o.horas_programadas
+  });
+  o.estado='finalizada'; o.avance_pct=100;
+  o.tareas_json=JSON.stringify(allCheck);
+  o.horas_ejecutadas=horasTotales||o.horas_ejecutadas||o.horas_programadas;
   await generarPDF(id_ot, true);
   cm('m-det'); renderRole();
 }
@@ -1130,9 +1136,9 @@ async function generarPDF(id_ot, silent=false){
   doc.text(`${o.id_ot} — ${o.nombre}`,M,y); y+=8;
   doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(80,80,80);
   doc.text(`Equipo: ${eq.nombre} [${eq.codigo_interno}]`,M,y); y+=5;
-  doc.text(`Tecnico: ${o.tecnico} · Sucursal: ${o.sucursal}`,M,y); y+=5;
-  doc.text(`Fecha programada: ${fmtDate(o.fecha_programada)} · Estado: ${EC[o.estado]?.lbl||o.estado}`,M,y); y+=5;
-  doc.text(`Horas: ${o.horas_ejecutadas||0}h ejecutadas / ${o.horas_programadas}h programadas · Avance: ${o.avance_pct||0}% (por horas)`,M,y); y+=8;
+  doc.text(`Tecnico: ${o.tecnico} · Sitio: ${o.sucursal}`,M,y); y+=5;
+  doc.text(`Fecha programada: ${fmtDate(o.fecha_programada)} · Fecha ejecucion: ${fmtDate(today())} · Estado: ${EC[o.estado]?.lbl||o.estado}`,M,y); y+=5;
+  doc.text(`Horas: ${o.horas_ejecutadas||0}h ejecutadas / ${o.horas_programadas}h programadas · Avance: ${o.avance_pct||0}%`,M,y); y+=8;
 
   // Barra progreso
   doc.setFillColor(42,48,72); doc.rect(M,y,W-M*2,4,'F');
@@ -1172,48 +1178,61 @@ async function generarPDF(id_ot, silent=false){
     doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont(undefined,'bold');
     const marcaTarea=isCheck?'[OK]':'[ ]';
     doc.text(`${marcaTarea} ${ti+1}. ${tarea.nombre}`,M+2,y+4);
-    // Horas totales de esta tarea alineadas a la derecha
-    doc.setFont(undefined,'normal'); doc.setFontSize(8);
-    doc.text(`${tarea.horas||0}h ejecutadas`,W-M-2,y+4,{align:'right'});
+    // Técnico y fecha en encabezado de tarea
+    doc.setFont(undefined,'normal'); doc.setFontSize(8); doc.setTextColor(200,220,255);
+    doc.text(`${o.tecnico} · ${fmtDate(tarea.fecha||o.fecha_programada)} · ${tarea.horas||0}h`,W-M-2,y+4,{align:'right'});
     y+=11;
 
     // Reportes de avance para esta tarea en orden cronológico
     let hayReportes=false;
     for(let ri=0;ri<reportes.length;ri++){
       const rep=reportes[ri];
-      if(!rep.tareas_json) continue;
-      let repTareas;
-      try{repTareas=JSON.parse(rep.tareas_json);}catch(e){continue;}
-      if(!repTareas[ti]) continue;
-      const repTarea=repTareas[ti];
-      // Solo mostrar si tiene horas o notas en este reporte
-      const horasRep=parseFloat(repTarea.horas)||0;
-      if(horasRep===0&&!rep.notas&&!rep.foto_url) continue;
+      // Mostrar el reporte si tiene foto o notas (independiente de las horas por tarea)
+      const tieneContenido=rep.foto_url||rep.notas;
+      if(!tieneContenido) continue;
+
+      // Intentar obtener horas específicas de esta tarea desde el reporte
+      let horasRep=0;
+      if(rep.tareas_json){
+        try{
+          const repTareas=JSON.parse(rep.tareas_json);
+          if(repTareas[ti]) horasRep=parseFloat(repTareas[ti].horas)||0;
+        }catch(e){}
+      }
       hayReportes=true;
 
-      if(y>260){doc.addPage();y=M;}
-      doc.setFillColor(248,249,252); doc.rect(M+3,y-1,W-M*2-3,rep.foto_url?42:14,'F');
+      if(y>255){doc.addPage();y=M;}
+      const alturaBloque=rep.foto_url?(rep.notas?55:48):20;
+      doc.setFillColor(248,249,252); doc.rect(M+3,y-1,W-M*2-3,alturaBloque,'F');
       doc.setTextColor(100,100,100); doc.setFontSize(8); doc.setFont(undefined,'normal');
       // Fecha, supervisor, horas
-      doc.text(`${fmtDT(rep.fecha_reporte)} · ${rep.supervisor} · ${horasRep}h`,M+5,y+4);
+      const lineaRep=`${fmtDT(rep.fecha_reporte)} · ${rep.supervisor}${horasRep?` · ${horasRep}h`:''}`;
+      doc.text(lineaRep,M+5,y+5);
+      let yOffset=12;
       if(rep.notas){
         const n=rep.notas.length>85?rep.notas.substring(0,82)+'...':rep.notas;
-        doc.text(`Nota: ${n}`,M+5,y+10);
+        doc.text(`Nota: ${n}`,M+5,y+yOffset);
+        yOffset+=7;
       }
-      // Foto incrustada si existe
+      // Foto incrustada
       if(rep.foto_url){
         try{
           const b64=await imgToBase64(rep.foto_url);
-          if(b64) doc.addImage(b64,'JPEG',M+5,y+13,50,28);
-        }catch(e){}
-        y+=43;
-      } else {
-        y+=rep.notas?16:8;
+          if(b64){
+            doc.addImage(b64,'JPEG',M+5,y+yOffset,55,32);
+            yOffset+=34;
+          }
+        }catch(e){
+          doc.setTextColor(180,180,180); doc.setFontSize(7);
+          doc.text('(foto no disponible)',M+5,y+yOffset);
+          yOffset+=6;
+        }
       }
+      y+=yOffset+4;
     }
     if(!hayReportes){
       doc.setTextColor(150,150,150); doc.setFontSize(8); doc.setFont(undefined,'italic');
-      doc.text('Sin reportes de avance',M+5,y+4); y+=8;
+      doc.text('Sin reportes de avance registrados',M+5,y+4); y+=10;
     }
     y+=5;
   }
