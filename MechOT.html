@@ -980,7 +980,10 @@ async function saveAvance(id_ot){
   o.notas=notas; o.estado=nuevoEstado;
 
   // Generar PDF en 2do plano
-  generarPDF(id_ot, true).catch(e=>console.warn('PDF error:',e));
+  generarPDF(id_ot, true).catch(e=>{
+    console.warn('PDF error:',e);
+    addAlert('warn',`PDF OT ${id_ot}`,`Error al generar: ${e.message||e}`);
+  });
 
   // Avisar si la foto falló
   if(fotoFallo){
@@ -1030,77 +1033,19 @@ async function finOT(id_ot){
   await supa.patch('ots',`id_ot=eq.${id_ot}`,{
     estado:'finalizada',avance_pct:100,
     tareas_json:JSON.stringify(allCheck),
-    horas_ejecutadas:horasTotales||o.horas_programadas
-  });
-  o.estado='finalizada'; o.avance_pct=100;
-  o.tareas_json=JSON.stringify(allCheck);
-  o.horas_ejecutadas=horasTotales||o.horas_programadas;
-  // Generar PDF final en background
-  generarPDF(id_ot, true).catch(e=>console.warn('PDF error:',e));
-  cm('m-det'); renderRole();
-}
-async function saveAvance(id_ot){
-  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
-  const avance=parseInt(document.getElementById('pv').value)||0;
-  const horas=parseFloat(document.getElementById('hv').value)||0;
-  const notas=document.getElementById('nv').value;
-  let fotoUrl=null;
-  // subir foto de avance si hay
-  if(_fotoAvanceFile){
-    const ts=new Date().toISOString().replace(/[:.]/g,'-');
-    const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/avance_${ts}.jpg`;
-    try{fotoUrl=await supa.upload(path,_fotoAvanceFile);}catch(e){console.warn('Error foto avance',e);}
-    _fotoAvanceFile=null;
-  }
-  // guardar reporte de avance
-  const reporte={ot_id:id_ot,equipo_cod:o.equipo_cod,avance_pct:avance,horas_ejecutadas:horas,notas,foto_url:fotoUrl,supervisor:S.userName,
-    tareas_json:o.tareas_json};
-  try{await supa.post('reportes_avance',reporte);}catch(e){console.warn('Error reporte',e);}
-  // actualizar OT
-  let nuevoEstado=o.estado;
-  if(o.estado==='sin_iniciar'&&avance>0) nuevoEstado='en_ejecucion';
-  else if(avance>0&&!['pausada','finalizada'].includes(o.estado)) nuevoEstado='en_proceso';
-  await supa.patch('ots',`id_ot=eq.${id_ot}`,{avance_pct:avance,horas_ejecutadas:horas,notas,estado:nuevoEstado});
-  o.avance_pct=avance; o.horas_ejecutadas=horas; o.notas=notas; o.estado=nuevoEstado;
-  // generar PDF actualizado automáticamente
-  await generarPDF(id_ot, true);
-  openSupOT(id_ot);
-}
-
-function openPausa(id_ot){
-  document.getElementById('m-st-t').textContent='Motivo de Pausa';
-  document.getElementById('m-st-b').innerHTML=`
-    <div class="fg"><label class="fl">Motivo</label><textarea class="fta" id="pmot" placeholder="Describe el problema..."></textarea></div>
-    <button class="btn bw bfull" onclick="savePausa('${id_ot}')"><i class="ti ti-player-pause"></i> Confirmar Pausa</button>`;
-  document.getElementById('m-st').classList.remove('hidden');
-}
-async function savePausa(id_ot){
-  const mot=document.getElementById('pmot').value.trim()||'Sin motivo';
-  await supa.patch('ots',`id_ot=eq.${id_ot}`,{estado:'pausada',motivo_pausa:mot});
-  const o=S.ots.find(x=>x.id_ot===id_ot); o.estado='pausada'; o.motivo_pausa=mot;
-  addAlert('crit',`OT ${id_ot} Pausada`,mot);
-  cm('m-st'); openSupOT(id_ot);
-}
-async function chgState(id_ot,ns){
-  await supa.patch('ots',`id_ot=eq.${id_ot}`,{estado:ns});
-  const o=S.ots.find(x=>x.id_ot===id_ot); o.estado=ns;
-  openSupOT(id_ot);
-}
-async function finOT(id_ot){
-  const o=S.ots.find(x=>x.id_ot===id_ot);
-  if(!o.foto_cierre_url){alert('Requiere foto de cierre');return;}
-  const tareas=JSON.parse(o.tareas_json||'[]');
-  const allCheck=tareas.map(t=>({...t,check:true}));
-  await supa.patch('ots',`id_ot=eq.${id_ot}`,{
-    estado:'finalizada',avance_pct:100,
-    tareas_json:JSON.stringify(allCheck),
     horas_ejecutadas:horasTotales||o.horas_ejecutadas||o.horas_programadas
   });
   o.estado='finalizada'; o.avance_pct=100;
   o.tareas_json=JSON.stringify(allCheck);
   o.horas_ejecutadas=horasTotales||o.horas_ejecutadas||o.horas_programadas;
-  await generarPDF(id_ot, true);
+  // Cerrar inmediatamente
   cm('m-det'); renderRole();
+  // PDF en background con delay para no bloquear UI
+  setTimeout(()=>{
+    generarPDF(id_ot, true).catch(e=>{
+      addAlert('warn',`PDF OT ${id_ot}`,`Error: ${e.message||e}`);
+    });
+  }, 1000);
 }
 
 // ===================== PDF REPORT =====================
