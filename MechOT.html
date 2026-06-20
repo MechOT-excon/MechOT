@@ -1002,7 +1002,7 @@ async function saveAvance(id_ot){
   const tareasConFoto=tareas.map((t,i)=>({
     nombre:t.nombre, check:t.check,
     horas:t.horas||0, tecnico:o.tecnico, fecha:today(),
-    foto_tarea_url:fotosPorTarea[i]||null
+    foto_tarea_url:fotosPorTarea[String(i)]||fotosPorTarea[i]||null
   }));
 
   const reporte={
@@ -1184,10 +1184,10 @@ async function generarPDF(id_ot, silent=false){
           }
         }catch(e){}
       }
-      const fotoMostrar=fotoTareaUrl||rep.foto_url||null;
+      const fotoMostrar=fotoTareaUrl||null; // solo foto específica de la tarea, no la general
 
-      // Mostrar el reporte siempre que tenga algo relevante (horas, foto o notas)
-      const tieneContenido=fotoMostrar||rep.notas||horasRep>0;
+      // Mostrar si hay algo relevante: foto de tarea, notas, o horas
+      const tieneContenido=fotoTareaUrl||rep.notas||horasRep>0||rep.foto_url;
       if(!tieneContenido) continue;
       hayReportes=true;
 
