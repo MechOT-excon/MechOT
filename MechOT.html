@@ -795,7 +795,7 @@ async function openSupOT(id_ot){
     <div class="card">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
         <div class="ct"><i class="ti ti-git-branch" style="color:var(--acc2)"></i> Estado: ${eb(o)}</div>
-        <span class="hp">${horasTotales}/${o.horas_programadas}h</span>
+        <span class="hp">${horasEjecutadas}h reales / ${o.horas_programadas}h prog</span>
       </div>
       <div style="display:flex;gap:.3rem;flex-wrap:wrap">
         ${o.estado==='sin_iniciar'?`<button class="sf-btn" style="color:#6ee7b7;border-color:rgba(16,185,129,.4)" onclick="chgState('${id_ot}','en_ejecucion')"><i class="ti ti-player-play"></i> Iniciar OT</button>`:''}
@@ -877,7 +877,7 @@ async function openSupOT(id_ot){
     :`<div class="card" style="text-align:center;padding:1.25rem;border-color:rgba(16,185,129,.3)">
       <i class="ti ti-circle-check" style="font-size:32px;color:var(--acc3);display:block;margin-bottom:.35rem"></i>
       <div style="font-weight:500;color:var(--acc3)">OT Finalizada · ${avancePct}%</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:.2rem">${horasTotales}h ejecutadas / ${o.horas_programadas}h programadas</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:.2rem">${horasEjecutadas}h reales / ${o.horas_programadas}h programadas</div>
       ${o.foto_cierre_url?`<a href="${o.foto_cierre_url}" target="_blank" style="font-size:11px;color:var(--acc2)">Ver foto de cierre</a>`:''}
     </div>`}
 
