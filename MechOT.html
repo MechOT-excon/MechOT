@@ -987,14 +987,19 @@ async function generarPDF(id_ot, silent=false){
   const doc=new jsPDF({unit:'mm',format:'a4'});
   const W=210; const M=15;
   let y=M;
-  // Header
-  doc.setFillColor(30,36,56); doc.rect(0,0,W,30,'F');
-  doc.setTextColor(255,255,255); doc.setFontSize(18); doc.setFont(undefined,'bold');
-  doc.text('MechOT',M,12);
-  doc.setFontSize(10); doc.setFont(undefined,'normal');
-  doc.text('Reporte de Orden de Trabajo',M,20);
-  doc.setFontSize(9); doc.text(`Generado: ${new Date().toLocaleString('es-CL')}`,W-M,20,{align:'right'});
-  y=38;
+  // Header estilo Excon
+  doc.setFillColor(255,255,255); doc.rect(0,0,W,40,'F');
+  doc.setFillColor(247,150,70); doc.rect(0,0,W,4,'F');
+  doc.setTextColor(40,40,40); doc.setFontSize(16); doc.setFont(undefined,'bold');
+  doc.text('CONSTRUCTORA EXCON S.A.',M,16);
+  doc.setFontSize(10); doc.setFont(undefined,'normal'); doc.setTextColor(100,100,100);
+  doc.text('Departamento de Maquinaria',M,23);
+  doc.setFontSize(9); doc.setTextColor(247,150,70); doc.setFont(undefined,'bold');
+  doc.text('REPORTE DE ORDEN DE TRABAJO',M,31);
+  doc.setFont(undefined,'normal'); doc.setTextColor(100,100,100); doc.setFontSize(8);
+  doc.text(`Generado: ${new Date().toLocaleString('es-CL')}`,W-M,31,{align:'right'});
+  doc.setFillColor(247,150,70); doc.rect(M,36,W-M*2,1,'F');
+  y=44;
   // OT Info
   doc.setTextColor(30,36,56); doc.setFontSize(14); doc.setFont(undefined,'bold');
   doc.text(`${o.id_ot} — ${o.nombre}`,M,y); y+=8;
@@ -1668,6 +1673,169 @@ async function saveEval(){
   }catch(e){alert('Error: '+e.message);}
 }
 
+
+// Convierte URL de imagen a base64 para incrustar en PDF
+async function imgToBase64(url){
+  try{
+    const r=await fetch(url);
+    const blob=await r.blob();
+    return new Promise((res,rej)=>{
+      const rd=new FileReader();
+      rd.onload=()=>res(rd.result);
+      rd.onerror=rej;
+      rd.readAsDataURL(blob);
+    });
+  }catch(e){return null;}
+}
+
+async function generarPDFInspeccion(idInsp, eq, st, realItems, ncs, inspData){
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210; const M=15;
+  let y=M;
+  const fechaStr=new Date().toLocaleString('es-CL');
+
+  // ── Header estilo Excon ──
+  // Fondo blanco
+  doc.setFillColor(255,255,255); doc.rect(0,0,W,40,'F');
+  // Línea naranja superior
+  doc.setFillColor(247,150,70); doc.rect(0,0,W,4,'F');
+  // Texto empresa
+  doc.setTextColor(40,40,40); doc.setFontSize(16); doc.setFont(undefined,'bold');
+  doc.text('CONSTRUCTORA EXCON S.A.',M,16);
+  doc.setFontSize(10); doc.setFont(undefined,'normal'); doc.setTextColor(100,100,100);
+  doc.text('Departamento de Maquinaria',M,23);
+  // Tipo de reporte
+  doc.setFontSize(9); doc.setTextColor(247,150,70); doc.setFont(undefined,'bold');
+  doc.text(`REPORTE DE INSPECCIÓN TÉCNICA — ${(st.tipoEq||st.tipoInsp||'').toUpperCase()}`,M,31);
+  // Fecha alineada a la derecha
+  doc.setFont(undefined,'normal'); doc.setTextColor(100,100,100); doc.setFontSize(8);
+  doc.text(`Generado: ${fechaStr}`,W-M,31,{align:'right'});
+  // Línea separadora naranja
+  doc.setFillColor(247,150,70); doc.rect(M,36,W-M*2,1,'F');
+  y=44;
+
+  // ── Info equipo ──
+  doc.setFillColor(245,246,250); doc.rect(M,y-4,W-M*2,30,'F');
+  doc.setTextColor(30,36,56); doc.setFontSize(13); doc.setFont(undefined,'bold');
+  doc.text(eq.nombre,M+3,y+4);
+  doc.setFontSize(9); doc.setFont(undefined,'normal'); doc.setTextColor(80,80,80);
+  doc.text(`Código: ${eq.codigo_interno}  ·  Tipo: ${eq.tipo||'—'}  ·  Sucursal: ${eq.sucursal}`,M+3,y+11);
+  doc.text(`Marca: ${eq.marca||'—'}  ·  Modelo: ${eq.modelo||'—'}`,M+3,y+17);
+  doc.text(`Inspector: ${inspData.inspector}  ·  Fecha: ${fechaStr}`,M+3,y+23);
+  y+=38;
+
+  // ── Resumen ──
+  const tot=realItems.length;
+  const buenos=realItems.filter(i=>i.estado==='B').length;
+  const ncTot=ncs.length;
+  const naTot=realItems.filter(i=>i.estado==='NA').length;
+  const pct=tot?Math.round(buenos/tot*100):0;
+
+  doc.setFillColor(247,150,70); doc.rect(M,y,W-M*2,6,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(10); doc.setFont(undefined,'bold');
+  doc.text('RESUMEN DE INSPECCIÓN',M+3,y+4);
+  y+=8;
+  doc.setFillColor(250,250,250); doc.rect(M,y,W-M*2,18,'F');
+  doc.setDrawColor(230,230,230); doc.rect(M,y,W-M*2,18,'S');
+  doc.setTextColor(40,40,40); doc.setFontSize(9); doc.setFont(undefined,'normal');
+  doc.text(`Total ítems evaluados: ${tot}`,M+3,y+6);
+  doc.setTextColor(34,139,34); doc.text(`Buenos (B): ${buenos}`,M+3,y+12);
+  doc.setTextColor(192,0,0); doc.text(`No Conformes (R/M): ${ncTot}`,M+55,y+12);
+  doc.setTextColor(100,100,100); doc.text(`N/A: ${naTot}`,M+115,y+12);
+  doc.setTextColor(247,150,70); doc.setFont(undefined,'bold'); doc.setFontSize(11);
+  doc.text(`${pct}% Cumplimiento`,W-M-2,y+12,{align:'right'});
+  // Barra progreso
+  doc.setFillColor(220,220,220); doc.rect(M,y+15,W-M*2,2,'F');
+  doc.setFillColor(34,139,34); doc.rect(M,y+15,(W-M*2)*pct/100,2,'F');
+  y+=24;
+
+  // ── NO CONFORMES ──
+  if(ncs.length>0){
+    doc.setTextColor(192,0,0); doc.setFontSize(12); doc.setFont(undefined,'bold');
+    doc.text(`No Conformes (${ncs.length})`,M,y); y+=7;
+    for(const item of ncs){
+      if(y>240){doc.addPage();y=M;}
+      doc.setFillColor(255,231,231); doc.rect(M,y-3,W-M*2,item.foto_url?32:20,'F');
+      doc.setDrawColor(192,0,0); doc.rect(M,y-3,W-M*2,item.foto_url?32:20,'S');
+      doc.setTextColor(192,0,0); doc.setFontSize(10); doc.setFont(undefined,'bold');
+      doc.text(`[${item.estado}] ${(item.nombre||item.name||'').substring(0,60)}`,M+2,y+3);
+      doc.setTextColor(80,80,80); doc.setFont(undefined,'normal'); doc.setFontSize(9);
+      if(item.seccion) doc.text(`Sección: ${item.seccion}`,M+2,y+9);
+      if(item.obs||item.observacion) doc.text(`Obs: ${(item.obs||item.observacion||'').substring(0,80)}`,M+2,y+15);
+      // Foto NC
+      if(item.foto_url){
+        try{
+          const b64=await imgToBase64(item.foto_url);
+          if(b64) doc.addImage(b64,'JPEG',W-M-30,y-2,28,28);
+        }catch(e){}
+        y+=34;
+      } else {
+        y+=24;
+      }
+    }
+    y+=4;
+  }
+
+  // ── DETALLE COMPLETO por sección ──
+  const secciones=[...new Set(realItems.map(i=>i.seccion||'General'))];
+  doc.setTextColor(30,36,56); doc.setFontSize(12); doc.setFont(undefined,'bold');
+  if(y>250){doc.addPage();y=M;}
+  doc.text('Detalle Completo',M,y); y+=7;
+
+  for(const sec of secciones){
+    if(y>265){doc.addPage();y=M;}
+    doc.setFillColor(46,117,182); doc.rect(M,y-3,W-M*2,8,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont(undefined,'bold');
+    doc.text(sec.toUpperCase(),M+2,y+1); y+=9;
+
+    const secItems=realItems.filter(i=>(i.seccion||'General')===sec);
+    for(const item of secItems){
+      if(y>275){doc.addPage();y=M;}
+      const isNC=['R','M'].includes(item.estado)||item.estado==='nc';
+      const isOK=item.estado==='B'||item.estado==='ok';
+      if(isNC) doc.setFillColor(255,231,231);
+      else if(isOK) doc.setFillColor(226,239,218);
+      else doc.setFillColor(242,242,242);
+      doc.rect(M,y-1,W-M*2,7,'F');
+      doc.setTextColor(isNC?192:isOK?55:100, isNC?0:isOK?86:100, isNC?0:isOK?35:100);
+      doc.setFontSize(8); doc.setFont(undefined,isNC?'bold':'normal');
+      const nom=((item.nombre||item.name||'').substring(0,70));
+      doc.text(nom,M+2,y+3);
+      doc.setFont(undefined,'bold');
+      doc.text(item.estado||'—',W-M-3,y+3,{align:'right'});
+      y+=7;
+      if(isNC&&(item.obs||item.observacion)){
+        if(y>275){doc.addPage();y=M;}
+        doc.setFillColor(255,240,240); doc.rect(M+4,y-1,W-M*2-4,5,'F');
+        doc.setTextColor(150,0,0); doc.setFont(undefined,'italic'); doc.setFontSize(7);
+        doc.text(`  → ${(item.obs||item.observacion||'').substring(0,90)}`,M+4,y+2);
+        y+=5;
+      }
+    }
+    y+=3;
+  }
+
+  // ── Footer ──
+  const pages=doc.internal.getNumberOfPages();
+  for(let p=1;p<=pages;p++){
+    doc.setPage(p);
+    doc.setFillColor(247,150,70); doc.rect(0,287,W,2,'F');
+    doc.setFillColor(255,255,255); doc.rect(0,289,W,8,'F');
+    doc.setTextColor(150,150,150); doc.setFontSize(7); doc.setFont(undefined,'normal');
+    doc.text(`Constructora Excon S.A. · ${idInsp} · ${eq.nombre} [${eq.codigo_interno}]`,M,294);
+    doc.text(`Pág. ${p}/${pages}`,W-M,294,{align:'right'});
+  }
+
+  // Subir PDF
+  try{
+    const pdfBlob=doc.output('blob');
+    const pdfFile=new File([pdfBlob],'inspeccion.pdf',{type:'application/pdf'});
+    const fechaISO=new Date().toISOString().split('T')[0];
+    const path=`${eq.codigo_interno}/inspecciones/${idInsp}_${(st.tipoEq||'insp').replace(/\s+/g,'_')}_${fechaISO}.pdf`;
+    await supa.upload(path,pdfFile);
+  }catch(e){console.warn('Error subiendo PDF:',e);}
+}
 
 async function verInspeccion(id){
   const insp=S.inspecciones.find(i=>i.id_inspeccion===id);
