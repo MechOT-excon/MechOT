@@ -990,18 +990,16 @@ async function generarPDF(id_ot, silent=false){
   const fechaGen=new Date().toLocaleString('es-CL');
   const nombreArchivo=`${o.id_ot}_${o.nombre.replace(/\s+/g,'_')}`;
 
-  // ── Header estilo Excon ──
-  doc.setFillColor(255,255,255); doc.rect(0,0,W,40,'F');
-  doc.setFillColor(247,150,70); doc.rect(0,0,W,4,'F');
-  doc.setTextColor(40,40,40); doc.setFontSize(16); doc.setFont(undefined,'bold');
-  doc.text('CONSTRUCTORA EXCON S.A.',M,16);
-  doc.setFontSize(10); doc.setFont(undefined,'normal'); doc.setTextColor(100,100,100);
-  doc.text('Departamento de Maquinaria',M,23);
+  // ── Header azul oscuro ──
+  doc.setFillColor(30,36,56); doc.rect(0,0,W,38,'F');
+  doc.setTextColor(255,255,255); doc.setFontSize(16); doc.setFont(undefined,'bold');
+  doc.text('CONSTRUCTORA EXCON S.A.',M,13);
+  doc.setFontSize(10); doc.setFont(undefined,'normal'); doc.setTextColor(180,190,220);
+  doc.text('Departamento de Maquinaria',M,21);
   doc.setFontSize(9); doc.setTextColor(247,150,70); doc.setFont(undefined,'bold');
-  doc.text('REPORTE DE ORDEN DE TRABAJO',M,31);
-  doc.setFont(undefined,'normal'); doc.setTextColor(100,100,100); doc.setFontSize(8);
-  doc.text(`Generado: ${fechaGen}`,W-M,31,{align:'right'});
-  doc.setFillColor(247,150,70); doc.rect(M,36,W-M*2,1,'F');
+  doc.text('REPORTE DE ORDEN DE TRABAJO',M,29);
+  doc.setFont(undefined,'normal'); doc.setTextColor(160,170,200); doc.setFontSize(8);
+  doc.text(`Generado: ${fechaGen}`,W-M,29,{align:'right'});
   y=44;
 
   // ── Info OT ──
@@ -1014,12 +1012,12 @@ async function generarPDF(id_ot, silent=false){
   doc.text(`Horas: ${o.horas_ejecutadas||0} ejecutadas / ${o.horas_programadas} programadas · Avance: ${o.avance_pct||0}%`,M,y); y+=8;
 
   // Barra progreso
-  doc.setFillColor(220,220,220); doc.rect(M,y,W-M*2,3,'F');
-  doc.setFillColor(247,150,70); doc.rect(M,y,(W-M*2)*(o.avance_pct||0)/100,3,'F');
-  y+=9;
+  doc.setFillColor(42,48,72); doc.rect(M,y,W-M*2,4,'F');
+  doc.setFillColor(59,130,246); doc.rect(M,y,(W-M*2)*(o.avance_pct||0)/100,4,'F');
+  y+=10;
 
   // ── Tareas ──
-  doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(247,150,70);
+  doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(59,130,246);
   doc.text('TAREAS',M,y); y+=5;
   tareas.forEach(t=>{
     doc.setFontSize(9); doc.setFont(undefined,'normal');
@@ -1032,7 +1030,7 @@ async function generarPDF(id_ot, silent=false){
 
   // ── Historial de Reportes con fotos ──
   if(reportes.length){
-    doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(247,150,70);
+    doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(59,130,246);
     doc.text('HISTORIAL DE REPORTES',M,y); y+=6;
     for(let i=0;i<reportes.length;i++){
       const r=reportes[i];
@@ -1071,7 +1069,7 @@ async function generarPDF(id_ot, silent=false){
   // ── Foto de Cierre ──
   if(o.foto_cierre_url){
     if(y>200){doc.addPage();y=M;}
-    doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(247,150,70);
+    doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(59,130,246);
     doc.text('FOTO DE CIERRE',M,y); y+=6;
     try{
       const b64=await imgToBase64(o.foto_cierre_url);
@@ -1085,15 +1083,14 @@ async function generarPDF(id_ot, silent=false){
     }
   }
 
-  // ── Footer estilo Excon ──
+  // ── Footer azul oscuro ──
   const pages=doc.internal.getNumberOfPages();
   for(let p=1;p<=pages;p++){
     doc.setPage(p);
-    doc.setFillColor(247,150,70); doc.rect(0,287,W,2,'F');
-    doc.setFillColor(255,255,255); doc.rect(0,289,W,8,'F');
-    doc.setTextColor(150,150,150); doc.setFontSize(7); doc.setFont(undefined,'normal');
-    doc.text(`Constructora Excon S.A. · OT ${o.id_ot} · ${eq.nombre} [${eq.codigo_interno}]`,M,294);
-    doc.text(`Pag. ${p}/${pages}`,W-M,294,{align:'right'});
+    doc.setFillColor(30,36,56); doc.rect(0,285,W,12,'F');
+    doc.setTextColor(150,150,180); doc.setFontSize(7); doc.setFont(undefined,'normal');
+    doc.text(`Constructora Excon S.A. · OT ${o.id_ot} · ${eq.nombre} [${eq.codigo_interno}]`,M,292);
+    doc.text(`Pag. ${p}/${pages}`,W-M,292,{align:'right'});
   }
 
   if(silent){
