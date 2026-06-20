@@ -921,31 +921,42 @@ async function handleFotoCierre(id_ot,inp){
   const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
   const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/foto_cierre.jpg`;
   try{
-    const url=await supa.upload(path,file);
+    const url=await supa.upload(path,await comprimirImagen(file));
     o.foto_cierre_url=url;
     await supa.patch('ots',`id_ot=eq.${id_ot}`,{foto_cierre_url:url});
     document.getElementById('pu-cierre').classList.add('ok');
     document.getElementById('pu-cierre').innerHTML=`<input type="file" id="fi-cierre" accept="image/*" capture="environment" onchange="handleFotoCierre('${id_ot}',this)"><i class="ti ti-photo-check" style="font-size:22px;color:var(--acc3);display:block;margin-bottom:.3rem"></i><div class="pu-txt">Foto adjunta ✓</div>`;
     document.querySelector(`button[onclick="finOT('${id_ot}')"]`)?.removeAttribute('disabled');
-  }catch(e){alert('Error al subir foto: '+e.message);}
+  }catch(e){
+    addAlert('crit',`Foto de cierre falló — OT ${id_ot}`,'No se pudo subir la foto. Verifica tu conexión e intenta de nuevo.');
+    alert('⚠ No se pudo subir la foto de cierre. Verifica tu conexión e intenta de nuevo.');
+  }
 }
 
 async function saveAvance(id_ot){
   const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
   const tareas=JSON.parse(o.tareas_json||'[]');
-  // Horas acumuladas de todas las tareas
   const horasTotales=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
-  // Avance = horas ejecutadas / horas programadas
   const avance=o.horas_programadas?Math.min(100,Math.round(horasTotales/o.horas_programadas*100)):0;
   const notas=document.getElementById('nv')?.value||'';
+
+  // Subir foto de avance
   let fotoUrl=null;
+  let fotoFallo=false;
   if(_fotoAvanceFile){
     const ts=new Date().toISOString().replace(/[:.]/g,'-');
     const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/avance_${ts}.jpg`;
-    try{fotoUrl=await supa.upload(path,_fotoAvanceFile);}catch(e){console.warn('Error foto avance',e);}
+    try{
+      const fileComp=await comprimirImagen(_fotoAvanceFile);
+      fotoUrl=await supa.upload(path,fileComp);
+    }catch(e){
+      fotoFallo=true;
+      console.warn('Error foto avance',e);
+    }
     _fotoAvanceFile=null;
   }
-  // Guardar reporte con detalle de tareas (quien, cuando, horas por tarea)
+
+  // Guardar reporte
   const reporte={
     ot_id:id_ot, equipo_cod:o.equipo_cod,
     avance_pct:avance, horas_ejecutadas:horasTotales,
@@ -953,23 +964,30 @@ async function saveAvance(id_ot){
     supervisor:S.userName,
     tareas_json:JSON.stringify(tareas.map(t=>({
       nombre:t.nombre, check:t.check,
-      horas:t.horas||0,
-      tecnico:o.tecnico,
-      fecha:today()
+      horas:t.horas||0, tecnico:o.tecnico, fecha:today()
     })))
   };
   try{await supa.post('reportes_avance',reporte);}catch(e){console.warn('Error reporte',e);}
+
   // Actualizar OT
-  let nuevoEstado=o.estado;
-  if(o.estado==='sin_iniciar') nuevoEstado='en_ejecucion';
-  else if(!['pausada','finalizada'].includes(o.estado)) nuevoEstado='en_proceso';
+  let nuevoEstado=o.estado==='sin_iniciar'?'en_ejecucion':
+    ['pausada','finalizada'].includes(o.estado)?o.estado:'en_proceso';
   await supa.patch('ots',`id_ot=eq.${id_ot}`,{
     avance_pct:avance, horas_ejecutadas:horasTotales,
     notas, estado:nuevoEstado, tareas_json:o.tareas_json
   });
   o.avance_pct=avance; o.horas_ejecutadas=horasTotales;
   o.notas=notas; o.estado=nuevoEstado;
-  await generarPDF(id_ot, true);
+
+  // Generar PDF en 2do plano
+  generarPDF(id_ot, true).catch(e=>console.warn('PDF error:',e));
+
+  // Avisar si la foto falló
+  if(fotoFallo){
+    addAlert('warn',`Foto no subida — OT ${id_ot}`,
+      'El reporte se guardó pero la foto falló. Intenta adjuntarla de nuevo en el próximo reporte.');
+  }
+
   openSupOT(id_ot);
 }
 
@@ -1017,24 +1035,10 @@ async function finOT(id_ot){
   o.estado='finalizada'; o.avance_pct=100;
   o.tareas_json=JSON.stringify(allCheck);
   o.horas_ejecutadas=horasTotales||o.horas_programadas;
-  await generarPDF(id_ot, true);
+  // Generar PDF final en background
+  generarPDF(id_ot, true).catch(e=>console.warn('PDF error:',e));
   cm('m-det'); renderRole();
 }
-async function handleFotoCierre(id_ot,inp){
-  if(!inp.files||!inp.files[0]) return;
-  const file=inp.files[0];
-  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
-  const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/foto_cierre.jpg`;
-  try{
-    const url=await supa.upload(path,file);
-    o.foto_cierre_url=url;
-    await supa.patch('ots',`id_ot=eq.${id_ot}`,{foto_cierre_url:url});
-    document.getElementById('pu-cierre').classList.add('ok');
-    document.getElementById('pu-cierre').innerHTML=`<input type="file" id="fi-cierre" accept="image/*" capture="environment" onchange="handleFotoCierre('${id_ot}',this)"><i class="ti ti-photo-check" style="font-size:22px;color:var(--acc3);display:block;margin-bottom:.3rem"></i><div class="pu-txt">Foto adjunta ✓</div>`;
-    document.querySelector(`button[onclick="finOT('${id_ot}')"]`)?.removeAttribute('disabled');
-  }catch(e){alert('Error al subir foto: '+e.message);}
-}
-
 async function saveAvance(id_ot){
   const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
   const avance=parseInt(document.getElementById('pv').value)||0;
@@ -1469,8 +1473,11 @@ function renderChecklistForm(){
 
 function handleFoto4(key,inp){
   if(!inp.files||!inp.files[0]) return;
-  const r=new FileReader(); r.onload=e=>{_fotos4lados[key]=e.target.result;renderChecklistForm();};
-  r.readAsDataURL(inp.files[0]);
+  comprimirImagen(inp.files[0]).then(comp=>{
+    const r=new FileReader();
+    r.onload=e=>{_fotos4lados[key]=e.target.result;renderChecklistForm();};
+    r.readAsDataURL(comp);
+  });
 }
 
 async function saveChecklist(){
@@ -1648,8 +1655,11 @@ function renderFormNeumaticos(){
 
 function handleFotoNeum(i,inp){
   if(!inp.files||!inp.files[0]) return;
-  const r=new FileReader(); r.onload=e=>{_neum.neumaticos[i].foto=e.target.result;renderFormNeumaticos();};
-  r.readAsDataURL(inp.files[0]);
+  comprimirImagen(inp.files[0]).then(comp=>{
+    const r=new FileReader();
+    r.onload=e=>{_neum.neumaticos[i].foto=e.target.result;renderFormNeumaticos();};
+    r.readAsDataURL(comp);
+  });
 }
 
 async function saveNeumaticos(){
@@ -1819,9 +1829,11 @@ function setEI(i,v){
 }
 function handleEF(i,inp){
   if(!inp.files||!inp.files[0]) return;
-  const r=new FileReader();
-  r.onload=e=>{S.evalState.items[i].foto=e.target.result;renderEvalForm();};
-  r.readAsDataURL(inp.files[0]);
+  comprimirImagen(inp.files[0]).then(comp=>{
+    const r=new FileReader();
+    r.onload=e=>{S.evalState.items[i].foto=e.target.result;renderEvalForm();};
+    r.readAsDataURL(comp);
+  });
 }
 
 async function saveEval(){
@@ -1866,18 +1878,46 @@ async function saveEval(){
 }
 
 
-// Convierte URL de imagen a base64 para incrustar en PDF
+// Comprimir imagen antes de subir (máx 1200px, calidad 0.75)
+async function comprimirImagen(file, maxPx=1200, calidad=0.75){
+  return new Promise(res=>{
+    const img=new Image();
+    const url=URL.createObjectURL(file);
+    img.onload=()=>{
+      URL.revokeObjectURL(url);
+      let w=img.width, h=img.height;
+      if(w>maxPx||h>maxPx){
+        if(w>h){h=Math.round(h*maxPx/w);w=maxPx;}
+        else{w=Math.round(w*maxPx/h);h=maxPx;}
+      }
+      const canvas=document.createElement('canvas');
+      canvas.width=w; canvas.height=h;
+      canvas.getContext('2d').drawImage(img,0,0,w,h);
+      canvas.toBlob(blob=>{
+        res(new File([blob],file.name,{type:'image/jpeg'}));
+      },'image/jpeg',calidad);
+    };
+    img.onerror=()=>{URL.revokeObjectURL(url);res(file);}; // si falla, usar original
+    img.src=url;
+  });
+}
 async function imgToBase64(url){
   try{
-    const r=await fetch(url);
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),8000); // 8 segundos máximo
+    const r=await fetch(url,{signal:controller.signal});
+    clearTimeout(timeout);
     const blob=await r.blob();
     return new Promise((res,rej)=>{
       const rd=new FileReader();
       rd.onload=()=>res(rd.result);
-      rd.onerror=rej;
+      rd.onerror=()=>res(null); // no fallar si hay error
       rd.readAsDataURL(blob);
     });
-  }catch(e){return null;}
+  }catch(e){
+    console.warn('imgToBase64 error:',e);
+    return null; // retornar null en vez de fallar
+  }
 }
 
 async function generarPDFInspeccion(idInsp, eq, st, realItems, ncs, inspData){
