@@ -819,12 +819,21 @@ async function openSupOT(id_ot){
             </div>
             <span style="font-size:12px;flex:1;${t.check?'text-decoration:line-through;color:var(--text2)':''}">${t.nombre}</span>
           </div>
-          <div style="display:flex;align-items:center;gap:.5rem;padding-left:1.7rem">
+          <div style="display:flex;align-items:center;gap:.5rem;padding-left:1.7rem;flex-wrap:wrap">
             <i class="ti ti-clock" style="font-size:11px;color:var(--text3)"></i>
             <input type="number" min="0" step="0.5" value="${t.horas||0}"
               onchange="actualizarHorasTarea('${id_ot}',${i},this.value)"
               style="width:60px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:2px 6px;color:var(--text);font-size:12px;font-family:var(--fm)">
-            <span style="font-size:10px;color:var(--text3)">horas en esta tarea</span>
+            <span style="font-size:10px;color:var(--text3)">horas</span>
+            <!-- Foto por tarea -->
+            <div onclick="document.getElementById('fi-tarea-${i}').click()"
+              style="display:flex;align-items:center;gap:.3rem;cursor:pointer;padding:3px 8px;border-radius:6px;border:1px solid ${t.fotoPendiente?'rgba(16,185,129,.4)':'var(--border)'};background:${t.fotoPendiente?'rgba(16,185,129,.08)':'var(--bg2)'}">
+              <input type="file" id="fi-tarea-${i}" accept="image/*" capture="environment" onchange="handleFotoTarea(${i},this)" style="display:none">
+              <i class="ti ti-${t.fotoPendiente?'photo-check':'camera'}" style="font-size:12px;color:${t.fotoPendiente?'var(--acc3)':'var(--text3)'}"></i>
+              <span style="font-size:10px;color:${t.fotoPendiente?'var(--acc3)':'var(--text3)'}">
+                ${t.fotoPendiente?'Foto lista':'Foto tarea'}
+              </span>
+            </div>
           </div>
         </div>`).join('')}
       </div>
@@ -905,7 +914,7 @@ async function actualizarHorasTarea(id_ot, idx, valor){
   await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,horas_ejecutadas:horasTotales,avance_pct:avance});
 }
 
-// Foto avance (opcional)
+// Foto avance general (opcional)
 let _fotoAvanceFile=null;
 function handleFotoAvance(inp){
   if(!inp.files||!inp.files[0]) return;
@@ -913,6 +922,26 @@ function handleFotoAvance(inp){
   document.getElementById('pu-av').classList.add('ok');
   document.getElementById('pu-av-icon').className='ti ti-photo-check';
   document.getElementById('pu-av-txt').textContent='Foto lista ✓';
+}
+
+// Foto por tarea específica
+let _fotosTareas={};
+function handleFotoTarea(idx, inp){
+  if(!inp.files||!inp.files[0]) return;
+  comprimirImagen(inp.files[0]).then(comp=>{
+    _fotosTareas[idx]=comp;
+    // Marcar visualmente que tiene foto
+    const s=S.ots.find(o=>o.tareas_json);
+    // Actualizar el botón visualmente
+    const btn=inp.parentElement;
+    if(btn){
+      btn.style.borderColor='rgba(16,185,129,.4)';
+      btn.style.background='rgba(16,185,129,.08)';
+      btn.innerHTML=`<input type="file" id="fi-tarea-${idx}" accept="image/*" capture="environment" onchange="handleFotoTarea(${idx},this)" style="display:none">
+        <i class="ti ti-photo-check" style="font-size:12px;color:var(--acc3)"></i>
+        <span style="font-size:10px;color:var(--acc3)">Foto lista</span>`;
+    }
+  });
 }
 
 async function handleFotoCierre(id_ot,inp){
@@ -940,7 +969,21 @@ async function saveAvance(id_ot){
   const avance=o.horas_programadas?Math.min(100,Math.round(horasTotales/o.horas_programadas*100)):0;
   const notas=document.getElementById('nv')?.value||'';
 
-  // Subir foto de avance
+  // Subir fotos por tarea
+  const fotosPorTarea={};
+  for(const [idx,file] of Object.entries(_fotosTareas)){
+    if(!file) continue;
+    const ts=new Date().toISOString().replace(/[:.]/g,'-');
+    const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/tarea${idx}_${ts}.jpg`;
+    try{
+      fotosPorTarea[idx]=await supa.upload(path,file);
+    }catch(e){
+      addAlert('warn',`Foto tarea ${parseInt(idx)+1} — OT ${id_ot}`,'No se pudo subir. Intenta de nuevo.');
+    }
+  }
+  _fotosTareas={};
+
+  // Subir foto general si hay
   let fotoUrl=null;
   let fotoFallo=false;
   if(_fotoAvanceFile){
@@ -951,21 +994,23 @@ async function saveAvance(id_ot){
       fotoUrl=await supa.upload(path,fileComp);
     }catch(e){
       fotoFallo=true;
-      console.warn('Error foto avance',e);
     }
     _fotoAvanceFile=null;
   }
 
-  // Guardar reporte
+  // Guardar reporte con fotos por tarea
+  const tareasConFoto=tareas.map((t,i)=>({
+    nombre:t.nombre, check:t.check,
+    horas:t.horas||0, tecnico:o.tecnico, fecha:today(),
+    foto_tarea_url:fotosPorTarea[i]||null
+  }));
+
   const reporte={
     ot_id:id_ot, equipo_cod:o.equipo_cod,
     avance_pct:avance, horas_ejecutadas:horasTotales,
     notas, foto_url:fotoUrl,
     supervisor:S.userName,
-    tareas_json:JSON.stringify(tareas.map(t=>({
-      nombre:t.nombre, check:t.check,
-      horas:t.horas||0, tecnico:o.tecnico, fecha:today()
-    })))
+    tareas_json:JSON.stringify(tareasConFoto)
   };
   try{await supa.post('reportes_avance',reporte);}catch(e){console.warn('Error reporte',e);}
 
@@ -979,18 +1024,12 @@ async function saveAvance(id_ot){
   o.avance_pct=avance; o.horas_ejecutadas=horasTotales;
   o.notas=notas; o.estado=nuevoEstado;
 
-  // Generar PDF en 2do plano
+  if(fotoFallo) addAlert('warn',`Foto general no subida — OT ${id_ot}`,'El reporte se guardó pero la foto falló.');
+
+  // PDF en 2do plano
   generarPDF(id_ot, true).catch(e=>{
-    console.warn('PDF error:',e);
-    addAlert('warn',`PDF OT ${id_ot}`,`Error al generar: ${e.message||e}`);
+    addAlert('warn',`PDF OT ${id_ot}`,`Error: ${e.message||e}`);
   });
-
-  // Avisar si la foto falló
-  if(fotoFallo){
-    addAlert('warn',`Foto no subida — OT ${id_ot}`,
-      'El reporte se guardó pero la foto falló. Intenta adjuntarla de nuevo en el próximo reporte.');
-  }
-
   openSupOT(id_ot);
 }
 
@@ -1132,22 +1171,28 @@ async function generarPDF(id_ot, silent=false){
     let hayReportes=false;
     for(let ri=0;ri<reportes.length;ri++){
       const rep=reportes[ri];
-      // Mostrar el reporte si tiene foto o notas (independiente de las horas por tarea)
-      const tieneContenido=rep.foto_url||rep.notas;
-      if(!tieneContenido) continue;
 
-      // Intentar obtener horas específicas de esta tarea desde el reporte
+      // Obtener foto y horas específicas de esta tarea
       let horasRep=0;
+      let fotoTareaUrl=null;
       if(rep.tareas_json){
         try{
           const repTareas=JSON.parse(rep.tareas_json);
-          if(repTareas[ti]) horasRep=parseFloat(repTareas[ti].horas)||0;
+          if(repTareas[ti]){
+            horasRep=parseFloat(repTareas[ti].horas)||0;
+            fotoTareaUrl=repTareas[ti].foto_tarea_url||repTareas[ti].foto_url||null;
+          }
         }catch(e){}
       }
+      const fotoMostrar=fotoTareaUrl||rep.foto_url||null;
+
+      // Mostrar el reporte siempre que tenga algo relevante (horas, foto o notas)
+      const tieneContenido=fotoMostrar||rep.notas||horasRep>0;
+      if(!tieneContenido) continue;
       hayReportes=true;
 
       if(y>255){doc.addPage();y=M;}
-      const alturaBloque=rep.foto_url?(rep.notas?55:48):20;
+      const alturaBloque=fotoMostrar?(rep.notas?55:48):20;
       doc.setFillColor(248,249,252); doc.rect(M+3,y-1,W-M*2-3,alturaBloque,'F');
       doc.setTextColor(100,100,100); doc.setFontSize(8); doc.setFont(undefined,'normal');
       // Fecha, supervisor, horas
@@ -1159,10 +1204,10 @@ async function generarPDF(id_ot, silent=false){
         doc.text(`Nota: ${n}`,M+5,y+yOffset);
         yOffset+=7;
       }
-      // Foto incrustada
-      if(rep.foto_url){
+      // Foto de tarea incrustada
+      if(fotoMostrar){
         try{
-          const b64=await imgToBase64(rep.foto_url);
+          const b64=await imgToBase64(fotoMostrar);
           if(b64){
             doc.addImage(b64,'JPEG',M+5,y+yOffset,55,32);
             yOffset+=34;
@@ -1833,7 +1878,8 @@ async function saveEval(){
     const res=await supa.post('inspecciones',inspData);
     S.inspecciones.unshift(res[0]);
     if(ncs.length>0) addAlert('crit',`${st.tipoInsp} ${eq.nombre}`,`${ncs.length} no conforme(s)`);
-    await generarPDFInspeccion(idInsp,eq,st,realItems,ncs,inspData);
+    // PDF en background
+    generarPDFInspeccion(idInsp,eq,st,realItems,ncs,inspData).catch(e=>console.warn('PDF insp error:',e));
     cm('m-eval'); renderRole();
     alert(`✓ Inspección guardada\n✓ ${conformes} Bueno · ✗ ${ncs.length} NC · ${inspData.total_na} NA`);
   }catch(e){alert('Error: '+e.message);}
@@ -1944,33 +1990,6 @@ async function generarPDFInspeccion(idInsp, eq, st, realItems, ncs, inspData){
   doc.setFillColor(34,139,34); doc.rect(M,y+15,(W-M*2)*pct/100,2,'F');
   y+=24;
 
-  // ── NO CONFORMES ──
-  if(ncs.length>0){
-    doc.setTextColor(192,0,0); doc.setFontSize(12); doc.setFont(undefined,'bold');
-    doc.text(`No Conformes (${ncs.length})`,M,y); y+=7;
-    for(const item of ncs){
-      if(y>240){doc.addPage();y=M;}
-      doc.setFillColor(255,231,231); doc.rect(M,y-3,W-M*2,item.foto_url?32:20,'F');
-      doc.setDrawColor(192,0,0); doc.rect(M,y-3,W-M*2,item.foto_url?32:20,'S');
-      doc.setTextColor(192,0,0); doc.setFontSize(10); doc.setFont(undefined,'bold');
-      doc.text(`[${item.estado}] ${(item.nombre||item.name||'').substring(0,60)}`,M+2,y+3);
-      doc.setTextColor(80,80,80); doc.setFont(undefined,'normal'); doc.setFontSize(9);
-      if(item.seccion) doc.text(`Sección: ${item.seccion}`,M+2,y+9);
-      if(item.obs||item.observacion) doc.text(`Obs: ${(item.obs||item.observacion||'').substring(0,80)}`,M+2,y+15);
-      // Foto NC
-      if(item.foto_url){
-        try{
-          const b64=await imgToBase64(item.foto_url);
-          if(b64) doc.addImage(b64,'JPEG',W-M-30,y-2,28,28);
-        }catch(e){}
-        y+=34;
-      } else {
-        y+=24;
-      }
-    }
-    y+=4;
-  }
-
   // ── DETALLE COMPLETO por sección ──
   const secciones=[...new Set(realItems.map(i=>i.seccion||'General'))];
   doc.setTextColor(30,36,56); doc.setFontSize(12); doc.setFont(undefined,'bold');
@@ -1999,12 +2018,27 @@ async function generarPDFInspeccion(idInsp, eq, st, realItems, ncs, inspData){
       doc.setFont(undefined,'bold');
       doc.text(item.estado||'—',W-M-3,y+3,{align:'right'});
       y+=7;
-      if(isNC&&(item.obs||item.observacion)){
-        if(y>275){doc.addPage();y=M;}
-        doc.setFillColor(255,240,240); doc.rect(M+4,y-1,W-M*2-4,5,'F');
-        doc.setTextColor(150,0,0); doc.setFont(undefined,'italic'); doc.setFontSize(7);
-        doc.text(`  → ${(item.obs||item.observacion||'').substring(0,90)}`,M+4,y+2);
-        y+=5;
+      if(isNC){
+        // Observación
+        if(item.obs||item.observacion){
+          if(y>275){doc.addPage();y=M;}
+          doc.setFillColor(255,240,240); doc.rect(M+4,y-1,W-M*2-4,6,'F');
+          doc.setTextColor(150,0,0); doc.setFont(undefined,'italic'); doc.setFontSize(7);
+          const obsText=(item.obs||item.observacion||'').substring(0,90);
+          doc.text(`  → ${obsText}`,M+4,y+3);
+          y+=7;
+        }
+        // Foto del ítem NC incrustada
+        if(item.foto_url){
+          if(y>240){doc.addPage();y=M;}
+          try{
+            const b64=await imgToBase64(item.foto_url);
+            if(b64){
+              doc.addImage(b64,'JPEG',M+4,y,55,35);
+              y+=38;
+            }
+          }catch(e){}
+        }
       }
     }
     y+=3;
@@ -2709,26 +2743,6 @@ function verDiaCompromisos(fecha){
         <div style="font-size:11px;color:var(--text2)"><i class="ti ti-map-pin"></i> ${c.destino_envio}</div>
       </div>`;
     }).join('')}`:''}`;
-  document.getElementById('m-com').classList.remove('hidden');
-}
-
-
-function verDiaCompromisos(fecha){
-  const coms=visibleCompromisos().filter(c=>c.fecha_limite===fecha&&c.estado!=='Entregado');
-  if(!coms.length) return;
-  const hoy=today();
-  const esPasado=fecha<hoy;
-  document.getElementById('m-com-t').textContent=`Compromisos ${fmtDate(fecha)}`;
-  document.getElementById('m-com-b').innerHTML=coms.map(c=>{
-    const eq=getEq(c.equipo_cod);
-    return `<div class="card" style="border-color:${esPasado?'rgba(239,68,68,.3)':'rgba(59,130,246,.25)'};margin-bottom:.5rem">
-      <div style="font-weight:500;font-size:13px">${eq.nombre}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:.2rem">${eq.codigo_interno} · ${eq.sucursal}</div>
-      <div style="font-size:12px;margin-top:.35rem"><i class="ti ti-flag" style="color:var(--acc)"></i> ${c.objetivo}</div>
-      <div style="font-size:11px;color:var(--text2);margin-top:.15rem"><i class="ti ti-map-pin"></i> ${c.destino_envio}</div>
-      ${eqEstadoBadge(eq.estado_equipo)} ${areaBadge(eq.area)}
-    </div>`;
-  }).join('');
   document.getElementById('m-com').classList.remove('hidden');
 }
 
