@@ -765,6 +765,8 @@ async function openSupOT(id_ot){
   const fin=o.estado==='finalizada';
   const tareas=JSON.parse(o.tareas_json||'[]');
   const chkDone=tareas.filter(t=>t.check).length;
+  const horasTotales=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
+  const avancePct=o.horas_programadas?Math.min(100,Math.round(horasTotales/o.horas_programadas*100)):0;
   const hoy=today();
   const com=visibleCompromisos().find(c=>c.equipo_cod===eq.codigo_interno&&c.estado!=='Entregado');
   let comAlert='';
@@ -777,11 +779,10 @@ async function openSupOT(id_ot){
       <div style="font-size:11px;color:var(--text2);margin-top:.2rem">${com.objetivo} → ${com.destino_envio}</div>
     </div>`;
   }
-  // load reportes
   let reportes=[];
   try{reportes=await supa.get('reportes_avance',`ot_id=eq.${id_ot}&order=fecha_reporte.desc`);}catch(e){}
 
-  document.getElementById('m-det-t').textContent=`${o.id_ot}`;
+  document.getElementById('m-det-t').textContent=o.id_ot;
   document.getElementById('m-det-b').innerHTML=`
     <div style="margin-bottom:.6rem">
       <div style="font-size:12px;font-weight:500">${eq.nombre} <span class="tag-tipo">${eq.codigo_interno}</span></div>
@@ -791,37 +792,49 @@ async function openSupOT(id_ot){
     ${!fin?`
     <!-- ESTADO -->
     <div class="card">
-      <div class="ct" style="margin-bottom:.35rem"><i class="ti ti-git-branch" style="color:var(--acc2)"></i> Estado: ${eb(o)}</div>
-      <div style="display:flex;gap:.3rem;flex-wrap:wrap;margin-top:.35rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.35rem">
+        <div class="ct"><i class="ti ti-git-branch" style="color:var(--acc2)"></i> Estado: ${eb(o)}</div>
+        <span class="hp">${horasTotales}/${o.horas_programadas}h</span>
+      </div>
+      <div style="display:flex;gap:.3rem;flex-wrap:wrap">
         ${o.estado==='sin_iniciar'?`<button class="sf-btn" style="color:#6ee7b7;border-color:rgba(16,185,129,.4)" onclick="chgState('${id_ot}','en_ejecucion')"><i class="ti ti-player-play"></i> Iniciar OT</button>`:''}
         ${['en_ejecucion','en_proceso'].includes(o.estado)?`<button class="sf-btn" onclick="openPausa('${id_ot}')"><i class="ti ti-player-pause"></i> Pausar</button>`:''}
         ${o.estado==='pausada'?`<button class="sf-btn" style="color:#6ee7b7;border-color:rgba(16,185,129,.4)" onclick="chgState('${id_ot}','en_ejecucion')"><i class="ti ti-player-play"></i> Reanudar</button>`:''}
       </div>
     </div>
-    <!-- REGISTRAR AVANCE -->
+
+    <!-- TAREAS CON HORAS -->
     <div class="card" style="border-color:rgba(245,158,11,.3)">
-      <div class="ct" style="margin-bottom:.6rem;color:var(--acc)"><i class="ti ti-chart-line"></i> Registrar Avance</div>
-      <div style="margin-bottom:.5rem">
-        <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text2);margin-bottom:.25rem">
-          <span>% Avance</span><span id="pv-lbl">${o.avance_pct||0}%</span>
-        </div>
-        <input type="range" id="pv" min="0" max="100" value="${o.avance_pct||0}" oninput="document.getElementById('pv-lbl').textContent=this.value+'%'">
-        <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--text3)"><span>0%</span><span>25%</span><span>50%</span><span>75%</span><span>100%</span></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+        <div class="ct" style="color:var(--acc)"><i class="ti ti-list-check"></i> Tareas y Horas</div>
+        <span style="font-size:11px;color:var(--text2)">${horasTotales}/${o.horas_programadas}h · ${avancePct}%</span>
       </div>
-      <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem">
-        <div style="flex:1">
-          <div style="font-size:10px;color:var(--text2);margin-bottom:.2rem;text-transform:uppercase;letter-spacing:.4px">Horas ejecutadas</div>
-          <div style="display:flex;align-items:center;gap:.4rem">
-            <input class="fi" id="hv" type="number" min="0" max="${o.horas_programadas}" step="0.5" value="${o.horas_ejecutadas||0}" style="width:75px;font-family:var(--fm)">
-            <span style="font-size:12px;color:var(--text2)">de ${o.horas_programadas}h</span>
+      ${pbw(avancePct)}
+      <div style="margin-top:.5rem">
+        ${tareas.map((t,i)=>`
+        <div style="background:${t.check?'rgba(16,185,129,.06)':'var(--bg3)'};border:1px solid ${t.check?'rgba(16,185,129,.2)':'var(--border)'};border-radius:8px;padding:.5rem .65rem;margin-bottom:.35rem">
+          <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.3rem">
+            <div class="tkc ${t.check?'on':''}" onclick="togTask('${id_ot}',${i})" style="cursor:pointer;flex-shrink:0">
+              ${t.check?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':''}
+            </div>
+            <span style="font-size:12px;flex:1;${t.check?'text-decoration:line-through;color:var(--text2)':''}">${t.nombre}</span>
           </div>
-        </div>
+          <div style="display:flex;align-items:center;gap:.5rem;padding-left:1.7rem">
+            <i class="ti ti-clock" style="font-size:11px;color:var(--text3)"></i>
+            <input type="number" min="0" step="0.5" value="${t.horas||0}"
+              onchange="actualizarHorasTarea('${id_ot}',${i},this.value)"
+              style="width:60px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:2px 6px;color:var(--text);font-size:12px;font-family:var(--fm)">
+            <span style="font-size:10px;color:var(--text3)">horas en esta tarea</span>
+          </div>
+        </div>`).join('')}
       </div>
+
+      <!-- NOTAS Y FOTO DEL REPORTE -->
+      <div class="div"></div>
       <div class="fg">
-        <label class="fl">Notas de avance (opcional)</label>
-        <textarea class="fta" id="nv" style="min-height:50px">${o.notas||''}</textarea>
+        <label class="fl">Notas del reporte (opcional)</label>
+        <textarea class="fta" id="nv" style="min-height:45px" placeholder="Observaciones del avance..."></textarea>
       </div>
-      <!-- FOTO AVANCE (opcional) -->
       <div class="fg">
         <label class="fl">Foto de avance (opcional)</label>
         <div class="pu" id="pu-av" onclick="document.getElementById('fi-av').click()">
@@ -830,19 +843,11 @@ async function openSupOT(id_ot){
           <div class="pu-txt" id="pu-av-txt">Toca para capturar foto</div>
         </div>
       </div>
-      <button class="btn bw bfull" onclick="saveAvance('${id_ot}')"><i class="ti ti-device-floppy"></i> Guardar Avance</button>
+      <button class="btn bw bfull" onclick="saveAvance('${id_ot}')">
+        <i class="ti ti-device-floppy"></i> Guardar Reporte de Avance
+      </button>
     </div>
-    <!-- TAREAS -->
-    <div class="card">
-      <div class="ct" style="margin-bottom:.35rem">Tareas (${chkDone}/${tareas.length})</div>
-      ${pbw(Math.round(chkDone/Math.max(tareas.length,1)*100))}
-      <div style="margin-top:.35rem">
-        ${tareas.map((t,i)=>`<div class="tki" onclick="togTask('${id_ot}',${i})" style="cursor:pointer">
-          <div class="tkc ${t.check?'on':''}">${t.check?'<i class="ti ti-check" style="font-size:10px;color:#fff"></i>':''}</div>
-          <span style="font-size:12px;${t.check?'text-decoration:line-through;color:var(--text2)':''}">${t.nombre}</span>
-        </div>`).join('')}
-      </div>
-    </div>
+
     <!-- FOTO CIERRE -->
     <div class="card">
       <div class="ct" style="margin-bottom:.35rem"><i class="ti ti-camera" style="color:var(--danger)"></i> Foto de Cierre
@@ -860,25 +865,44 @@ async function openSupOT(id_ot){
     ${!o.foto_cierre_url?`<div style="text-align:center;font-size:10px;color:var(--text2);margin-top:.25rem">Adjunta la foto de cierre para finalizar</div>`:''}`
     :`<div class="card" style="text-align:center;padding:1.25rem;border-color:rgba(16,185,129,.3)">
       <i class="ti ti-circle-check" style="font-size:32px;color:var(--acc3);display:block;margin-bottom:.35rem"></i>
-      <div style="font-weight:500;color:var(--acc3)">OT Finalizada</div>
+      <div style="font-weight:500;color:var(--acc3)">OT Finalizada · ${avancePct}%</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:.2rem">${horasTotales}h ejecutadas / ${o.horas_programadas}h programadas</div>
       ${o.foto_cierre_url?`<a href="${o.foto_cierre_url}" target="_blank" style="font-size:11px;color:var(--acc2)">Ver foto de cierre</a>`:''}
     </div>`}
+
     <!-- HISTORIAL REPORTES -->
     ${reportes.length?`<div class="card" style="margin-top:.5rem">
-      <div class="ct" style="margin-bottom:.5rem"><i class="ti ti-history" style="color:var(--text2)"></i> Historial de Reportes (${reportes.length})</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+        <div class="ct"><i class="ti ti-history" style="color:var(--text2)"></i> Historial (${reportes.length})</div>
+        <button class="btn bg bsm" onclick="generarPDF('${id_ot}')"><i class="ti ti-file-type-pdf"></i> PDF</button>
+      </div>
       ${reportes.map(r=>`<div style="border-bottom:1px solid var(--border);padding:.5rem 0">
-        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:.2rem">
-          <span style="font-weight:500;color:var(--acc)">${r.avance_pct}% avance · ${r.horas_ejecutadas}h</span>
-          <span style="color:var(--text3);font-family:var(--fm)">${fmtDT(r.fecha_reporte)}</span>
+        <div style="display:flex;justify-content:space-between;font-size:11px;margin-bottom:.15rem">
+          <span style="font-weight:500;color:var(--acc)">${r.avance_pct}% · ${r.horas_ejecutadas}h acumuladas</span>
+          <span style="color:var(--text3);font-family:var(--fm);font-size:10px">${fmtDT(r.fecha_reporte)}</span>
         </div>
-        ${r.notas?`<div style="font-size:11px;color:var(--text2)">${r.notas}</div>`:''}
+        <div style="font-size:10px;color:var(--text2)">${r.supervisor}</div>
+        ${r.notas?`<div style="font-size:11px;color:var(--text2);margin-top:.15rem">${r.notas}</div>`:''}
         ${r.foto_url?`<a href="${r.foto_url}" target="_blank" style="font-size:11px;color:var(--acc2)"><i class="ti ti-photo"></i> Ver foto</a>`:''}
       </div>`).join('')}
-      <div class="div"></div>
-      <button class="btn bg bsm bfull" onclick="generarPDF('${id_ot}')"><i class="ti ti-file-type-pdf"></i> Descargar PDF Reporte</button>
     </div>`:''}
   `;
   document.getElementById('m-det').classList.remove('hidden');
+}
+
+// Actualizar horas de una tarea específica
+async function actualizarHorasTarea(id_ot, idx, valor){
+  const o=S.ots.find(x=>x.id_ot===id_ot);
+  const tareas=JSON.parse(o.tareas_json||'[]');
+  tareas[idx].horas=parseFloat(valor)||0;
+  // Horas totales acumuladas
+  const horasTotales=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
+  // Avance = horas ejecutadas / horas programadas
+  const avance=o.horas_programadas?Math.min(100,Math.round(horasTotales/o.horas_programadas*100)):0;
+  o.tareas_json=JSON.stringify(tareas);
+  o.horas_ejecutadas=horasTotales;
+  o.avance_pct=avance;
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,horas_ejecutadas:horasTotales,avance_pct:avance});
 }
 
 // Foto avance (opcional)
@@ -891,6 +915,111 @@ function handleFotoAvance(inp){
   document.getElementById('pu-av-txt').textContent='Foto lista ✓';
 }
 
+async function handleFotoCierre(id_ot,inp){
+  if(!inp.files||!inp.files[0]) return;
+  const file=inp.files[0];
+  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
+  const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/foto_cierre.jpg`;
+  try{
+    const url=await supa.upload(path,file);
+    o.foto_cierre_url=url;
+    await supa.patch('ots',`id_ot=eq.${id_ot}`,{foto_cierre_url:url});
+    document.getElementById('pu-cierre').classList.add('ok');
+    document.getElementById('pu-cierre').innerHTML=`<input type="file" id="fi-cierre" accept="image/*" capture="environment" onchange="handleFotoCierre('${id_ot}',this)"><i class="ti ti-photo-check" style="font-size:22px;color:var(--acc3);display:block;margin-bottom:.3rem"></i><div class="pu-txt">Foto adjunta ✓</div>`;
+    document.querySelector(`button[onclick="finOT('${id_ot}')"]`)?.removeAttribute('disabled');
+  }catch(e){alert('Error al subir foto: '+e.message);}
+}
+
+async function saveAvance(id_ot){
+  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
+  const tareas=JSON.parse(o.tareas_json||'[]');
+  // Horas acumuladas de todas las tareas
+  const horasTotales=tareas.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
+  // Avance = horas ejecutadas / horas programadas
+  const avance=o.horas_programadas?Math.min(100,Math.round(horasTotales/o.horas_programadas*100)):0;
+  const notas=document.getElementById('nv')?.value||'';
+  let fotoUrl=null;
+  if(_fotoAvanceFile){
+    const ts=new Date().toISOString().replace(/[:.]/g,'-');
+    const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/avance_${ts}.jpg`;
+    try{fotoUrl=await supa.upload(path,_fotoAvanceFile);}catch(e){console.warn('Error foto avance',e);}
+    _fotoAvanceFile=null;
+  }
+  // Guardar reporte con detalle de tareas (quien, cuando, horas por tarea)
+  const reporte={
+    ot_id:id_ot, equipo_cod:o.equipo_cod,
+    avance_pct:avance, horas_ejecutadas:horasTotales,
+    notas, foto_url:fotoUrl,
+    supervisor:S.userName,
+    tareas_json:JSON.stringify(tareas.map(t=>({
+      nombre:t.nombre, check:t.check,
+      horas:t.horas||0,
+      tecnico:o.tecnico,
+      fecha:today()
+    })))
+  };
+  try{await supa.post('reportes_avance',reporte);}catch(e){console.warn('Error reporte',e);}
+  // Actualizar OT
+  let nuevoEstado=o.estado;
+  if(o.estado==='sin_iniciar') nuevoEstado='en_ejecucion';
+  else if(!['pausada','finalizada'].includes(o.estado)) nuevoEstado='en_proceso';
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{
+    avance_pct:avance, horas_ejecutadas:horasTotales,
+    notas, estado:nuevoEstado, tareas_json:o.tareas_json
+  });
+  o.avance_pct=avance; o.horas_ejecutadas=horasTotales;
+  o.notas=notas; o.estado=nuevoEstado;
+  await generarPDF(id_ot, true);
+  openSupOT(id_ot);
+}
+
+async function togTask(id_ot,idx){
+  const o=S.ots.find(x=>x.id_ot===id_ot);
+  const tareas=JSON.parse(o.tareas_json||'[]');
+  tareas[idx].check=!tareas[idx].check;
+  const done=tareas.filter(t=>t.check).length;
+  const pct=Math.round(done/tareas.length*100);
+  o.tareas_json=JSON.stringify(tareas); o.avance_pct=pct;
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,avance_pct:pct});
+  openSupOT(id_ot);
+}
+
+function openPausa(id_ot){
+  document.getElementById('m-st-t').textContent='Motivo de Pausa';
+  document.getElementById('m-st-b').innerHTML=`
+    <div class="fg"><label class="fl">Motivo</label><textarea class="fta" id="pmot" placeholder="Describe el problema..."></textarea></div>
+    <button class="btn bw bfull" onclick="savePausa('${id_ot}')"><i class="ti ti-player-pause"></i> Confirmar Pausa</button>`;
+  document.getElementById('m-st').classList.remove('hidden');
+}
+async function savePausa(id_ot){
+  const mot=document.getElementById('pmot').value.trim()||'Sin motivo';
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{estado:'pausada',motivo_pausa:mot});
+  const o=S.ots.find(x=>x.id_ot===id_ot); o.estado='pausada'; o.motivo_pausa=mot;
+  addAlert('crit',`OT ${id_ot} Pausada`,mot);
+  cm('m-st'); openSupOT(id_ot);
+}
+async function chgState(id_ot,ns){
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{estado:ns});
+  const o=S.ots.find(x=>x.id_ot===id_ot); o.estado=ns;
+  openSupOT(id_ot);
+}
+async function finOT(id_ot){
+  const o=S.ots.find(x=>x.id_ot===id_ot);
+  if(!o.foto_cierre_url){alert('Requiere foto de cierre');return;}
+  const tareas=JSON.parse(o.tareas_json||'[]');
+  const allCheck=tareas.map(t=>({...t,check:true}));
+  const horasTotales=allCheck.reduce((a,t)=>a+(parseFloat(t.horas)||0),0);
+  await supa.patch('ots',`id_ot=eq.${id_ot}`,{
+    estado:'finalizada',avance_pct:100,
+    tareas_json:JSON.stringify(allCheck),
+    horas_ejecutadas:horasTotales||o.horas_programadas
+  });
+  o.estado='finalizada'; o.avance_pct=100;
+  o.tareas_json=JSON.stringify(allCheck);
+  o.horas_ejecutadas=horasTotales||o.horas_programadas;
+  await generarPDF(id_ot, true);
+  cm('m-det'); renderRole();
+}
 async function handleFotoCierre(id_ot,inp){
   if(!inp.files||!inp.files[0]) return;
   const file=inp.files[0];
@@ -931,17 +1060,6 @@ async function saveAvance(id_ot){
   o.avance_pct=avance; o.horas_ejecutadas=horas; o.notas=notas; o.estado=nuevoEstado;
   // generar PDF actualizado automáticamente
   await generarPDF(id_ot, true);
-  openSupOT(id_ot);
-}
-
-async function togTask(id_ot,idx){
-  const o=S.ots.find(x=>x.id_ot===id_ot);
-  const tareas=JSON.parse(o.tareas_json||'[]');
-  tareas[idx].check=!tareas[idx].check;
-  const done=tareas.filter(t=>t.check).length;
-  const pct=Math.round(done/tareas.length*100);
-  o.tareas_json=JSON.stringify(tareas); o.avance_pct=pct;
-  await supa.patch('ots',`id_ot=eq.${id_ot}`,{tareas_json:o.tareas_json,avance_pct:pct});
   openSupOT(id_ot);
 }
 
@@ -1009,61 +1127,93 @@ async function generarPDF(id_ot, silent=false){
   doc.text(`Equipo: ${eq.nombre} [${eq.codigo_interno}]`,M,y); y+=5;
   doc.text(`Tecnico: ${o.tecnico} · Sucursal: ${o.sucursal}`,M,y); y+=5;
   doc.text(`Fecha programada: ${fmtDate(o.fecha_programada)} · Estado: ${EC[o.estado]?.lbl||o.estado}`,M,y); y+=5;
-  doc.text(`Horas: ${o.horas_ejecutadas||0} ejecutadas / ${o.horas_programadas} programadas · Avance: ${o.avance_pct||0}%`,M,y); y+=8;
+  doc.text(`Horas: ${o.horas_ejecutadas||0}h ejecutadas / ${o.horas_programadas}h programadas · Avance: ${o.avance_pct||0}% (por horas)`,M,y); y+=8;
 
   // Barra progreso
   doc.setFillColor(42,48,72); doc.rect(M,y,W-M*2,4,'F');
   doc.setFillColor(59,130,246); doc.rect(M,y,(W-M*2)*(o.avance_pct||0)/100,4,'F');
   y+=10;
 
-  // ── Tareas ──
+  // ── RESUMEN DE TAREAS ──
   doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(59,130,246);
-  doc.text('TAREAS',M,y); y+=5;
-  tareas.forEach(t=>{
-    doc.setFontSize(9); doc.setFont(undefined,'normal');
-    // Usar texto ASCII para evitar problemas con simbolos especiales
-    const marca = t.check ? '[OK]' : '[  ]';
-    doc.setTextColor(t.check?34:100, t.check?139:100, t.check?34:100);
-    doc.text(`${marca} ${t.nombre}`,M+3,y); y+=5;
+  doc.text('RESUMEN DE TAREAS',M,y); y+=6;
+  doc.setFillColor(245,247,252); doc.rect(M,y-2,W-M*2,tareasBase.length*7+4,'F');
+  doc.setDrawColor(200,210,230); doc.rect(M,y-2,W-M*2,tareasBase.length*7+4,'S');
+  tareasBase.forEach((t,i)=>{
+    const isOK=t.check;
+    const hrs=parseFloat(t.horas)||0;
+    doc.setFontSize(8); doc.setFont(undefined,isOK?'bold':'normal');
+    doc.setTextColor(isOK?34:60, isOK?139:60, isOK?34:60);
+    doc.text(`${isOK?'[OK]':'[ ] '} ${i+1}. ${t.nombre}`,M+3,y+4);
+    doc.setTextColor(100,100,100); doc.setFont(undefined,'normal');
+    doc.text(`${hrs}h`,W-M-3,y+4,{align:'right'});
+    y+=7;
   });
-  y+=4;
+  y+=8;
 
-  // ── Historial de Reportes con fotos ──
-  if(reportes.length){
-    doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(59,130,246);
-    doc.text('HISTORIAL DE REPORTES',M,y); y+=6;
-    for(let i=0;i<reportes.length;i++){
-      const r=reportes[i];
-      if(y>240){doc.addPage();y=M;}
-      // Fondo del reporte
-      doc.setFillColor(250,250,250); doc.rect(M,y-3,W-M*2,r.foto_url?50:18,'F');
-      doc.setDrawColor(230,230,230); doc.rect(M,y-3,W-M*2,r.foto_url?50:18,'S');
-      // Encabezado reporte
-      doc.setFontSize(9); doc.setFont(undefined,'bold'); doc.setTextColor(247,150,70);
-      doc.text(`Reporte ${i+1} · ${fmtDT(r.fecha_reporte)}`,M+2,y+1); 
-      doc.setFont(undefined,'normal'); doc.setTextColor(60,60,60);
-      doc.text(`Avance: ${r.avance_pct}%  ·  Horas: ${r.horas_ejecutadas}h  ·  Supervisor: ${r.supervisor}`,M+2,y+7);
-      if(r.notas){
-        doc.setTextColor(80,80,80);
-        const notaCorta=r.notas.length>90?r.notas.substring(0,87)+'...':r.notas;
-        doc.text(`Notas: ${notaCorta}`,M+2,y+13);
+  // ── DETALLE DE TAREAS CON HISTORIAL CRONOLÓGICO POR TAREA ──
+  doc.setFontSize(10); doc.setFont(undefined,'bold'); doc.setTextColor(59,130,246);
+  doc.text('DETALLE DE TAREAS',M,y); y+=7;
+
+  // Construir historial por tarea a partir de todos los reportes
+  // Cada reporte tiene tareas_json con el estado de cada tarea en ese momento
+  const tareasBase=JSON.parse(o.tareas_json||'[]');
+
+  for(let ti=0;ti<tareasBase.length;ti++){
+    const tarea=tareasBase[ti];
+    if(y>250){doc.addPage();y=M;}
+
+    // Encabezado de tarea
+    const isCheck=tarea.check;
+    doc.setFillColor(isCheck?59:30, isCheck?130:100, isCheck?246:180);
+    doc.rect(M,y-2,W-M*2,9,'F');
+    doc.setTextColor(255,255,255); doc.setFontSize(9); doc.setFont(undefined,'bold');
+    const marcaTarea=isCheck?'[OK]':'[ ]';
+    doc.text(`${marcaTarea} ${ti+1}. ${tarea.nombre}`,M+2,y+4);
+    // Horas totales de esta tarea alineadas a la derecha
+    doc.setFont(undefined,'normal'); doc.setFontSize(8);
+    doc.text(`${tarea.horas||0}h ejecutadas`,W-M-2,y+4,{align:'right'});
+    y+=11;
+
+    // Reportes de avance para esta tarea en orden cronológico
+    let hayReportes=false;
+    for(let ri=0;ri<reportes.length;ri++){
+      const rep=reportes[ri];
+      if(!rep.tareas_json) continue;
+      let repTareas;
+      try{repTareas=JSON.parse(rep.tareas_json);}catch(e){continue;}
+      if(!repTareas[ti]) continue;
+      const repTarea=repTareas[ti];
+      // Solo mostrar si tiene horas o notas en este reporte
+      const horasRep=parseFloat(repTarea.horas)||0;
+      if(horasRep===0&&!rep.notas&&!rep.foto_url) continue;
+      hayReportes=true;
+
+      if(y>260){doc.addPage();y=M;}
+      doc.setFillColor(248,249,252); doc.rect(M+3,y-1,W-M*2-3,rep.foto_url?42:14,'F');
+      doc.setTextColor(100,100,100); doc.setFontSize(8); doc.setFont(undefined,'normal');
+      // Fecha, supervisor, horas
+      doc.text(`${fmtDT(rep.fecha_reporte)} · ${rep.supervisor} · ${horasRep}h`,M+5,y+4);
+      if(rep.notas){
+        const n=rep.notas.length>85?rep.notas.substring(0,82)+'...':rep.notas;
+        doc.text(`Nota: ${n}`,M+5,y+10);
       }
-      // Foto del reporte incrustada
-      if(r.foto_url){
+      // Foto incrustada si existe
+      if(rep.foto_url){
         try{
-          const b64=await imgToBase64(r.foto_url);
-          if(b64){
-            doc.addImage(b64,'JPEG',M+2,y+17,60,35);
-          }
-        }catch(e){
-          doc.setTextColor(150,150,150); doc.setFontSize(7);
-          doc.text('(foto no disponible)',M+2,y+30);
-        }
-        y+=55;
+          const b64=await imgToBase64(rep.foto_url);
+          if(b64) doc.addImage(b64,'JPEG',M+5,y+13,50,28);
+        }catch(e){}
+        y+=43;
       } else {
-        y+=22;
+        y+=rep.notas?16:8;
       }
     }
+    if(!hayReportes){
+      doc.setTextColor(150,150,150); doc.setFontSize(8); doc.setFont(undefined,'italic');
+      doc.text('Sin reportes de avance',M+5,y+4); y+=8;
+    }
+    y+=5;
   }
 
   // ── Foto de Cierre ──
