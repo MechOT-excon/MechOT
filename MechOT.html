@@ -2254,23 +2254,28 @@ function renderJefeDash(tc){
     const proceso=eqList.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso').length;
     const disp=eqList.filter(e=>e.estado_equipo==='Disponible').length;
     const ruta=eqList.filter(e=>e.estado_equipo==='En Ruta').length;
+    const codsConCom=new Set(comList.filter(c=>c.estado!=='Entregado').map(c=>c.equipo_cod));
     // Atrasados = En Proceso con fecha vencida
     const atrasados=comList.filter(c=>{
       if(c.estado==='Entregado') return false;
       const eq=getEq(c.equipo_cod);
       return c.fecha_limite<hoy&&(eq?.estado_equipo||'En Proceso')==='En Proceso';
     }).length;
+    // Compromiso vigente = En Proceso con fecha futura
+    const conFecha=comList.filter(c=>{
+      if(c.estado==='Entregado') return false;
+      const eq=getEq(c.equipo_cod);
+      return c.fecha_limite>=hoy&&(eq?.estado_equipo||'En Proceso')==='En Proceso';
+    }).length;
+    // Sin fecha = En Proceso sin compromiso asignado
+    const eqEnProceso=eqList.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso');
+    const sinFecha=eqEnProceso.filter(e=>!codsConCom.has(e.codigo_interno)).length;
     // Entregados esta semana = fecha_entrega_real dentro de la semana
     const entSemana=comList.filter(c=>c.estado==='Entregado'&&c.fecha_entrega_real>=lunStr&&c.fecha_entrega_real<=domStr).length;
-    // Otros estados de compromisos esta semana
     const comsSem=comList.filter(c=>c.estado!=='Entregado');
-    const rutaSem=comsSem.filter(c=>{const eq=getEq(c.equipo_cod);return eq?.estado_equipo==='En Ruta'&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;}).length;
-    const dispSem=comsSem.filter(c=>{const eq=getEq(c.equipo_cod);return eq?.estado_equipo==='Disponible'&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;}).length;
-    const pendSem=comsSem.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length;
-    const metaSem=entSemana+rutaSem+dispSem+pendSem;
-    const pctSem=metaSem?Math.min(100,Math.round(entSemana/metaSem*100)):0;
+    const metaSem=comsSem.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length;
     const proxSem=comsSem.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr).length;
-    return {proceso,disp,ruta,atrasados,entSemana,rutaSem,dispSem,pendSem,metaSem,pctSem,proxSem};
+    return {proceso,disp,ruta,atrasados,conFecha,sinFecha,entSemana,metaSem,proxSem};
   }
 
   const eqVis=visibleEquipos();
@@ -2297,42 +2302,46 @@ function renderJefeDash(tc){
 
   function tablaKPI(k){
     const aTiempo=k.proceso+k.disp+k.ruta;
+    const sitioFiltro=k.nombre||'todos';
     return `<table style="width:100%;border-collapse:collapse;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
       <tr>
-        <td colspan="4" style="border:1px solid var(--border);padding:8px 10px;background:var(--bg3);text-align:center">
+        <td colspan="4" style="border:1px solid var(--border);padding:8px 10px;background:var(--bg3);text-align:center;cursor:pointer" onclick="verListaEquipos('todos','${sitioFiltro}')">
           <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Total equipos esta semana</div>
-          <div style="font-size:22px;font-weight:500;color:var(--text);font-family:var(--fm)">${k.total||aTiempo+k.atrasados}</div>
+          <div style="font-size:22px;font-weight:500;color:var(--text);font-family:var(--fm)">${k.total||k.proceso+k.disp+k.ruta+k.entSemana}</div>
         </td>
       </tr>
       <tr>
-        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center">
-          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">A tiempo</div>
-          <div style="font-size:18px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${aTiempo}</div>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('conFecha','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Compromiso vigente</div>
+          <div style="font-size:16px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.conFecha}</div>
         </td>
-        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:rgba(239,68,68,.06)">
-          <div style="font-size:10px;color:var(--danger);text-transform:uppercase;letter-spacing:.4px">Atrasados</div>
-          <div style="font-size:18px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.atrasados}</div>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;background:rgba(239,68,68,.06);cursor:pointer" onclick="verListaEquipos('atrasados','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--danger);text-transform:uppercase;letter-spacing:.3px">Atrasados</div>
+          <div style="font-size:16px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.atrasados}</div>
+        </td>
+        <td colspan="2" style="border:1px solid var(--border);padding:7px 6px;text-align:center;background:rgba(245,158,11,.06);cursor:pointer" onclick="verListaEquipos('sinFecha','${sitioFiltro}')">
+          <div style="font-size:9px;color:#ef9f27;text-transform:uppercase;letter-spacing:.3px">Sin fecha comprometida</div>
+          <div style="font-size:16px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.sinFecha}</div>
         </td>
       </tr>
       <tr>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('En Proceso','${sitioFiltro}')">
           <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En proceso</div>
           <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
         </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('Disponible','${sitioFiltro}')">
           <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Disponibles</div>
           <div style="font-size:16px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
         </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('En Ruta','${sitioFiltro}')">
           <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En ruta</div>
           <div style="font-size:16px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
         </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('entregados_sem','${sitioFiltro}')">
           <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Entregados sem.</div>
           <div style="font-size:16px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
         </td>
       </tr>
-
       <tr>
         <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:var(--bg3)">
           <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Compromisos esta semana</div>
@@ -2388,21 +2397,6 @@ function renderJefeDash(tc){
     </div>
     ${tablaKPI(s)}`).join('')}
 
-    <!-- EVALUACIONES PENDIENTES -->
-    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-clipboard-check"></i> Evaluaciones pendientes</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <div style="border:1.5px solid ${kActual.faltaMec>0?'var(--danger)':'var(--acc3)'};border-radius:10px;padding:10px 12px;background:${kActual.faltaMec>0?'rgba(239,68,68,.05)':'transparent'}">
-        <div style="font-size:10px;font-weight:500;color:${kActual.faltaMec>0?'var(--danger)':'var(--text2)'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-tool"></i> Falta eval. mecánica</div>
-        <div style="font-size:28px;font-weight:500;color:${kActual.faltaMec>0?'var(--danger)':'var(--acc3)'};font-family:var(--fm)">${kActual.faltaMec}</div>
-        <div style="font-size:10px;color:var(--text2);margin-top:2px">equipos sin evaluar</div>
-      </div>
-      <div style="border:1.5px solid ${kActual.faltaHab>0?'var(--danger)':'var(--acc3)'};border-radius:10px;padding:10px 12px;background:${kActual.faltaHab>0?'rgba(239,68,68,.05)':'transparent'}">
-        <div style="font-size:10px;font-weight:500;color:${kActual.faltaHab>0?'var(--danger)':'var(--text2)'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-clipboard-list"></i> Falta checklist hab.</div>
-        <div style="font-size:28px;font-weight:500;color:${kActual.faltaHab>0?'var(--danger)':'var(--acc3)'};font-family:var(--fm)">${kActual.faltaHab}</div>
-        <div style="font-size:10px;color:var(--text2);margin-top:2px">equipos sin checklist</div>
-      </div>
-    </div>
-
     <!-- ATRASADOS DETALLE -->
     ${kActual.atrasados>0?`
     <div style="font-size:10px;font-weight:500;color:var(--danger);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:rgba(239,68,68,.08);border-radius:8px;margin-bottom:8px"><i class="ti ti-alert-triangle"></i> Detalle de atrasados</div>
@@ -2434,27 +2428,51 @@ function renderJefeDash(tc){
       }).join('');
     })()}`:''}
 
-    <!-- OTs -->
-    <div class="shd"><i class="ti ti-clipboard-list"></i> OTs de Trabajo</div>
-    <div class="sg">
-      <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">Total OTs</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc3)">${cumpl}%</div><div class="sl">Cumplimiento</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc2)">${ots.filter(o=>['en_ejecucion','en_proceso'].includes(o.estado)).length}</div><div class="sl">En Curso</div></div>
-      <div class="sc"><div class="sv" style="color:var(--warn)">${paus}</div><div class="sl">Pausadas</div></div>
+    <!-- EVALUACIONES PENDIENTES -->
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-clipboard-check"></i> Evaluaciones pendientes</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="border:1.5px solid ${kActual.faltaMec>0?'var(--danger)':'var(--acc3)'};border-radius:10px;padding:10px 12px;background:${kActual.faltaMec>0?'rgba(239,68,68,.05)':'transparent'}">
+        <div style="font-size:10px;font-weight:500;color:${kActual.faltaMec>0?'var(--danger)':'var(--text2)'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-tool"></i> Falta eval. mecánica</div>
+        <div style="font-size:28px;font-weight:500;color:${kActual.faltaMec>0?'var(--danger)':'var(--acc3)'};font-family:var(--fm)">${kActual.faltaMec}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">equipos sin evaluar</div>
+      </div>
+      <div style="border:1.5px solid ${kActual.faltaHab>0?'var(--danger)':'var(--acc3)'};border-radius:10px;padding:10px 12px;background:${kActual.faltaHab>0?'rgba(239,68,68,.05)':'transparent'}">
+        <div style="font-size:10px;font-weight:500;color:${kActual.faltaHab>0?'var(--danger)':'var(--text2)'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-clipboard-list"></i> Falta checklist hab.</div>
+        <div style="font-size:28px;font-weight:500;color:${kActual.faltaHab>0?'var(--danger)':'var(--acc3)'};font-family:var(--fm)">${kActual.faltaHab}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">equipos sin checklist</div>
+      </div>
     </div>
-    ${atras.length?`<div class="card" style="border-color:rgba(239,68,68,.2)">
-      <div class="ct" style="color:var(--danger);margin-bottom:.35rem"><i class="ti ti-clock-off"></i> OTs Atrasadas (${atras.length})</div>
-      ${atras.map(o=>`<div style="font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)">${o.id_ot} · ${o.nombre} · ${fmtDate(o.fecha_programada)}</div>`).join('')}
-    </div>`:''}
-    <div class="card">
-      <div class="ct" style="margin-bottom:.5rem">Por Técnico</div>
-      ${[...new Set(ots.map(o=>o.tecnico))].map(t=>{
-        const to=ots.filter(o=>o.tecnico===t);
-        const tf=to.filter(o=>o.estado==='finalizada').length;
-        const tp=Math.round(tf/to.length*100);
-        return `<div style="margin-bottom:.55rem"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:.2rem"><span>${t}</span><span style="font-family:var(--fm);color:var(--text2);font-size:11px">${tf}/${to.length}</span></div>${pbw(tp)}</div>`;
-      }).join('')||'<div style="font-size:12px;color:var(--text2)">Sin datos</div>'}
-    </div>`;
+
+    <!-- OTs ESTA SEMANA -->
+    ${(()=>{
+      const otsSem=visibleOTs().filter(o=>o.fecha_programada>=lunStr&&o.fecha_programada<=domStr);
+      const finSem=otsSem.filter(o=>o.estado==='finalizada').length;
+      const enCursoSem=otsSem.filter(o=>['en_ejecucion','en_proceso'].includes(o.estado)).length;
+      const pausSem=otsSem.filter(o=>o.estado==='pausada').length;
+      const cumplSem=otsSem.length?Math.round(finSem/otsSem.length*100):0;
+      const atrasSem=otsSem.filter(o=>o.estado!=='finalizada'&&o.fecha_programada<hoy);
+      if(!otsSem.length) return '';
+      return `<div class="shd"><i class="ti ti-clipboard-list"></i> OTs esta semana</div>
+      <div class="sg">
+        <div class="sc"><div class="sv" style="color:var(--acc)">${otsSem.length}</div><div class="sl">Total</div></div>
+        <div class="sc"><div class="sv" style="color:var(--acc3)">${cumplSem}%</div><div class="sl">Cumplimiento</div></div>
+        <div class="sc"><div class="sv" style="color:var(--acc2)">${enCursoSem}</div><div class="sl">En Curso</div></div>
+        <div class="sc"><div class="sv" style="color:var(--warn)">${pausSem}</div><div class="sl">Pausadas</div></div>
+      </div>
+      ${atrasSem.length?`<div class="card" style="border-color:rgba(239,68,68,.2)">
+        <div class="ct" style="color:var(--danger);margin-bottom:.35rem"><i class="ti ti-clock-off"></i> OTs Atrasadas (${atrasSem.length})</div>
+        ${atrasSem.map(o=>`<div style="font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)">${o.id_ot} · ${o.nombre} · ${fmtDate(o.fecha_programada)}</div>`).join('')}
+      </div>`:''}
+      <div class="card">
+        <div class="ct" style="margin-bottom:.5rem">Por Técnico</div>
+        ${[...new Set(otsSem.map(o=>o.tecnico))].map(t=>{
+          const to=otsSem.filter(o=>o.tecnico===t);
+          const tf=to.filter(o=>o.estado==='finalizada').length;
+          const tp=Math.round(tf/to.length*100);
+          return `<div style="margin-bottom:.55rem"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:.2rem"><span>${t}</span><span style="font-family:var(--fm);color:var(--text2);font-size:11px">${tf}/${to.length}</span></div>${pbw(tp)}</div>`;
+        }).join('')||'<div style="font-size:12px;color:var(--text2)">Sin datos</div>'}
+      </div>`;
+    })()}`;
 }
 
 
@@ -2724,6 +2742,79 @@ async function cambiarEstadoEquipo(cod, nuevoEstado){
   }catch(e){alert('Error: '+e.message);}
 }
 
+function verListaEquipos(filtro, sitio){
+  const hoy=today();
+  const {lunStr,domStr}=getWeekRange();
+  let eqs=S.equipos;
+  // Filtrar por sitio
+  if(sitio&&sitio!=='todos') eqs=eqs.filter(e=>e.sucursal===sitio);
+  // Filtrar por área activa
+  const area=S.dashArea||S.areaFiltro||'todos';
+  if(area!=='todos') eqs=eqs.filter(e=>e.area===area);
+  // Filtrar por estado
+  let titulo='Todos los equipos';
+  let lista=[];
+  if(filtro==='todos'){
+    lista=eqs; titulo='Todos los equipos';
+  } else if(filtro==='En Proceso'){
+    lista=eqs.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso');
+    titulo='En Proceso';
+  } else if(filtro==='Disponible'){
+    lista=eqs.filter(e=>e.estado_equipo==='Disponible');
+    titulo='Disponibles';
+  } else if(filtro==='En Ruta'){
+    lista=eqs.filter(e=>e.estado_equipo==='En Ruta');
+    titulo='En Ruta';
+  } else if(filtro==='entregados_sem'){
+    const coms=S.compromisos.filter(c=>c.estado==='Entregado'&&c.fecha_entrega_real>=lunStr&&c.fecha_entrega_real<=domStr);
+    const cods=new Set(coms.map(c=>c.equipo_cod));
+    lista=eqs.filter(e=>cods.has(e.codigo_interno));
+    titulo='Entregados esta semana';
+  } else if(filtro==='atrasados'){
+    const coms=S.compromisos.filter(c=>{
+      if(c.estado==='Entregado') return false;
+      const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
+      return c.fecha_limite<hoy&&(eq?.estado_equipo||'En Proceso')==='En Proceso';
+    });
+    const cods=new Set(coms.map(c=>c.equipo_cod));
+    lista=eqs.filter(e=>cods.has(e.codigo_interno));
+    titulo='Atrasados';
+  } else if(filtro==='a_tiempo'){
+    lista=eqs.filter(e=>['En Proceso','Disponible','En Ruta'].includes(e.estado_equipo||'En Proceso'));
+    titulo='A tiempo';
+  } else if(filtro==='conFecha'){
+    const cods=new Set(S.compromisos.filter(c=>c.estado!=='Entregado'&&c.fecha_limite>=hoy).map(c=>c.equipo_cod));
+    lista=eqs.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&cods.has(e.codigo_interno));
+    titulo='Compromiso vigente';
+  } else if(filtro==='sinFecha'){
+    const cods=new Set(S.compromisos.filter(c=>c.estado!=='Entregado').map(c=>c.equipo_cod));
+    lista=eqs.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&!cods.has(e.codigo_interno));
+    titulo='Sin fecha comprometida';
+  }
+  if(sitio&&sitio!=='todos') titulo+=` — ${sitio}`;
+  // Mostrar en modal
+  document.getElementById('m-det-t').textContent=titulo+` (${lista.length})`;
+  document.getElementById('m-det-b').innerHTML=lista.length?
+    lista.map(e=>{
+      const com=S.compromisos.find(c=>c.equipo_cod===e.codigo_interno&&c.estado!=='Entregado');
+      const est=e.estado_equipo||'En Proceso';
+      return `<div class="card" style="margin-bottom:.4rem;cursor:pointer" onclick="openEqDetail('${e.codigo_interno}')">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:12px;font-weight:500">${e.nombre}</div>
+            <div style="font-size:10px;color:var(--text2)">${e.codigo_interno} · ${e.tipo}</div>
+          </div>
+          <div style="text-align:right">
+            ${eqEstadoBadge(est)}
+            ${com?`<div style="font-size:10px;color:${com.fecha_limite<hoy?'var(--danger)':'var(--text2)'};margin-top:2px">${fmtDate(com.fecha_limite)}</div>`:''}
+          </div>
+        </div>
+      </div>`;
+    }).join('')
+    :`<div class="es"><i class="ti ti-check"></i> Sin equipos en esta categoría</div>`;
+  document.getElementById('m-det').classList.remove('hidden');
+}
+
 async function cambiarReq(cod, campo, valor){
   try{
     const patch={};
@@ -2950,51 +3041,64 @@ function renderAdminKPIs(tc){
     const proceso=eqList.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso').length;
     const disp=eqList.filter(e=>e.estado_equipo==='Disponible').length;
     const ruta=eqList.filter(e=>e.estado_equipo==='En Ruta').length;
+    const codsConCom=new Set(comList.filter(c=>c.estado!=='Entregado').map(c=>c.equipo_cod));
     const atrasados=comList.filter(c=>{
       if(c.estado==='Entregado') return false;
       const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
       return c.fecha_limite<hoy&&(eq?.estado_equipo||'En Proceso')==='En Proceso';
     }).length;
+    const conFecha=comList.filter(c=>{
+      if(c.estado==='Entregado') return false;
+      const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
+      return c.fecha_limite>=hoy&&(eq?.estado_equipo||'En Proceso')==='En Proceso';
+    }).length;
+    const eqEnProceso=eqList.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso');
+    const sinFecha=eqEnProceso.filter(e=>!codsConCom.has(e.codigo_interno)).length;
     const entSemana=comList.filter(c=>c.estado==='Entregado'&&c.fecha_entrega_real>=lunStr&&c.fecha_entrega_real<=domStr).length;
     const comsSem=comList.filter(c=>c.estado!=='Entregado');
     const metaSem=comsSem.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length;
     const proxSem=comsSem.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr).length;
-    return {proceso,disp,ruta,atrasados,entSemana,metaSem,proxSem};
+    return {proceso,disp,ruta,atrasados,conFecha,sinFecha,entSemana,metaSem,proxSem};
   }
 
   function tablaKPIAdmin(k){
     const aTiempo=k.proceso+k.disp+k.ruta;
+    const sitioFiltro=k.nombre||'todos';
     return `<table style="width:100%;border-collapse:collapse;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
       <tr>
         <td colspan="4" style="border:1px solid var(--border);padding:8px 10px;background:var(--bg3);text-align:center">
           <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Total equipos esta semana</div>
-          <div style="font-size:22px;font-weight:500;color:var(--text);font-family:var(--fm)">${k.total||aTiempo+k.atrasados}</div>
+          <div style="font-size:22px;font-weight:500;color:var(--text);font-family:var(--fm)">${k.total||k.proceso+k.disp+k.ruta+k.entSemana}</div>
         </td>
       </tr>
       <tr>
-        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center">
-          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">A tiempo</div>
-          <div style="font-size:18px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${aTiempo}</div>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('conFecha','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Compromiso vigente</div>
+          <div style="font-size:16px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.conFecha}</div>
         </td>
-        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:rgba(239,68,68,.06)">
-          <div style="font-size:10px;color:var(--danger);text-transform:uppercase;letter-spacing:.4px">Atrasados</div>
-          <div style="font-size:18px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.atrasados}</div>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;background:rgba(239,68,68,.06);cursor:pointer" onclick="verListaEquipos('atrasados','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--danger);text-transform:uppercase;letter-spacing:.3px">Atrasados</div>
+          <div style="font-size:16px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.atrasados}</div>
+        </td>
+        <td colspan="2" style="border:1px solid var(--border);padding:7px 6px;text-align:center;background:rgba(245,158,11,.06);cursor:pointer" onclick="verListaEquipos('sinFecha','${sitioFiltro}')">
+          <div style="font-size:9px;color:#ef9f27;text-transform:uppercase;letter-spacing:.3px">Sin fecha comprometida</div>
+          <div style="font-size:16px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.sinFecha}</div>
         </td>
       </tr>
       <tr>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick=\"verListaEquipos('En Proceso','${sitioFiltro}')\">
           <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En proceso</div>
           <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
         </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick=\"verListaEquipos('Disponible','${sitioFiltro}')\">
           <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Disponibles</div>
           <div style="font-size:16px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
         </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick=\"verListaEquipos('En Ruta','${sitioFiltro}')\">
           <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En ruta</div>
           <div style="font-size:16px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
         </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick=\"verListaEquipos('entregados_sem','${sitioFiltro}')\">
           <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Entregados sem.</div>
           <div style="font-size:16px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
         </td>
@@ -3062,21 +3166,6 @@ function renderAdminKPIs(tc){
       <i class="ti ti-map-pin"></i> ${s.nombre}
     </div>
     ${tablaKPIAdmin(s)}`).join('')}
-
-    <!-- EVALUACIONES PENDIENTES -->
-    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-clipboard-check"></i> Evaluaciones pendientes</div>
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-      <div style="border:1.5px solid ${kActual.faltaMec>0?'var(--danger)':'var(--acc3)'};border-radius:10px;padding:10px 12px;background:${kActual.faltaMec>0?'rgba(239,68,68,.05)':'transparent'}">
-        <div style="font-size:10px;font-weight:500;color:${kActual.faltaMec>0?'var(--danger)':'var(--text2)'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-tool"></i> Falta eval. mecánica</div>
-        <div style="font-size:28px;font-weight:500;color:${kActual.faltaMec>0?'var(--danger)':'var(--acc3)'};font-family:var(--fm)">${kActual.faltaMec}</div>
-        <div style="font-size:10px;color:var(--text2);margin-top:2px">equipos sin evaluar</div>
-      </div>
-      <div style="border:1.5px solid ${kActual.faltaHab>0?'var(--danger)':'var(--acc3)'};border-radius:10px;padding:10px 12px;background:${kActual.faltaHab>0?'rgba(239,68,68,.05)':'transparent'}">
-        <div style="font-size:10px;font-weight:500;color:${kActual.faltaHab>0?'var(--danger)':'var(--text2)'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-clipboard-list"></i> Falta checklist hab.</div>
-        <div style="font-size:28px;font-weight:500;color:${kActual.faltaHab>0?'var(--danger)':'var(--acc3)'};font-family:var(--fm)">${kActual.faltaHab}</div>
-        <div style="font-size:10px;color:var(--text2);margin-top:2px">equipos sin checklist</div>
-      </div>
-    </div>
     ${kActual.atrasados>0?`
     <div style="font-size:10px;font-weight:500;color:var(--danger);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:rgba(239,68,68,.08);border-radius:8px;margin-bottom:8px"><i class="ti ti-alert-triangle"></i> Detalle de atrasados</div>
     ${Object.entries(atrasosPorMes).sort().map(([mes,lista])=>{
@@ -3098,25 +3187,49 @@ function renderAdminKPIs(tc){
       </div>`;
     }).join('')}`:''}
 
-    <!-- OTs -->
-    <div class="shd"><i class="ti ti-clipboard-list"></i> OTs de Trabajo</div>
-    <div class="sg">
-      <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">Total OTs</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc3)">${cumpl}%</div><div class="sl">Cumplimiento</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc2)">${ots.filter(o=>['en_ejecucion','en_proceso'].includes(o.estado)).length}</div><div class="sl">En Curso</div></div>
-      <div class="sc"><div class="sv" style="color:var(--warn)">${paus}</div><div class="sl">Pausadas</div></div>
-    </div>
-    ${atras.length?`<div class="card" style="border-color:rgba(239,68,68,.2)">
-      <div class="ct" style="color:var(--danger);margin-bottom:.35rem"><i class="ti ti-clock-off"></i> OTs Atrasadas (${atras.length})</div>
-      ${atras.map(o=>`<div style="font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)">${o.id_ot} · ${o.nombre} · ${fmtDate(o.fecha_programada)}</div>`).join('')}
-    </div>`:''}
-    <div class="card">
-      <div class="ct" style="margin-bottom:.5rem">Inspecciones</div>
-      <div class="sg">
-        <div class="sc"><div class="sv" style="color:var(--acc)">${S.inspecciones.length}</div><div class="sl">Total</div></div>
-        <div class="sc"><div class="sv" style="color:var(--danger)">${ncTotal}</div><div class="sl">NC Totales</div></div>
+    <!-- EVALUACIONES PENDIENTES -->
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-clipboard-check"></i> Evaluaciones pendientes</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="border:1.5px solid ${kActual.faltaMec>0?'var(--danger)':'var(--acc3)'};border-radius:10px;padding:10px 12px;background:${kActual.faltaMec>0?'rgba(239,68,68,.05)':'transparent'}">
+        <div style="font-size:10px;font-weight:500;color:${kActual.faltaMec>0?'var(--danger)':'var(--text2)'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-tool"></i> Falta eval. mecánica</div>
+        <div style="font-size:28px;font-weight:500;color:${kActual.faltaMec>0?'var(--danger)':'var(--acc3)'};font-family:var(--fm)">${kActual.faltaMec}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">equipos sin evaluar</div>
       </div>
-    </div>`;
+      <div style="border:1.5px solid ${kActual.faltaHab>0?'var(--danger)':'var(--acc3)'};border-radius:10px;padding:10px 12px;background:${kActual.faltaHab>0?'rgba(239,68,68,.05)':'transparent'}">
+        <div style="font-size:10px;font-weight:500;color:${kActual.faltaHab>0?'var(--danger)':'var(--text2)'};text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-clipboard-list"></i> Falta checklist hab.</div>
+        <div style="font-size:28px;font-weight:500;color:${kActual.faltaHab>0?'var(--danger)':'var(--acc3)'};font-family:var(--fm)">${kActual.faltaHab}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">equipos sin checklist</div>
+      </div>
+    </div>
+
+    <!-- OTs ESTA SEMANA -->
+    ${(()=>{
+      const otsSem=S.ots.filter(o=>o.fecha_programada>=lunStr&&o.fecha_programada<=domStr);
+      const finSem=otsSem.filter(o=>o.estado==='finalizada').length;
+      const enCursoSem=otsSem.filter(o=>['en_ejecucion','en_proceso'].includes(o.estado)).length;
+      const pausSem=otsSem.filter(o=>o.estado==='pausada').length;
+      const cumplSem=otsSem.length?Math.round(finSem/otsSem.length*100):0;
+      const atrasSem=otsSem.filter(o=>o.estado!=='finalizada'&&o.fecha_programada<hoy);
+      if(!otsSem.length) return '<div class="es"><i class="ti ti-clipboard-off"></i>Sin OTs esta semana</div>';
+      return `<div class="shd"><i class="ti ti-clipboard-list"></i> OTs esta semana</div>
+      <div class="sg">
+        <div class="sc"><div class="sv" style="color:var(--acc)">${otsSem.length}</div><div class="sl">Total</div></div>
+        <div class="sc"><div class="sv" style="color:var(--acc3)">${cumplSem}%</div><div class="sl">Cumplimiento</div></div>
+        <div class="sc"><div class="sv" style="color:var(--acc2)">${enCursoSem}</div><div class="sl">En Curso</div></div>
+        <div class="sc"><div class="sv" style="color:var(--warn)">${pausSem}</div><div class="sl">Pausadas</div></div>
+      </div>
+      ${atrasSem.length?`<div class="card" style="border-color:rgba(239,68,68,.2)">
+        <div class="ct" style="color:var(--danger);margin-bottom:.35rem"><i class="ti ti-clock-off"></i> OTs Atrasadas (${atrasSem.length})</div>
+        ${atrasSem.map(o=>`<div style="font-size:12px;padding:.25rem 0;border-bottom:1px solid var(--border)">${o.id_ot} · ${o.nombre} · ${fmtDate(o.fecha_programada)}</div>`).join('')}
+      </div>`:''}
+      <div class="card">
+        <div class="ct" style="margin-bottom:.5rem">Inspecciones</div>
+        <div class="sg">
+          <div class="sc"><div class="sv" style="color:var(--acc)">${S.inspecciones.length}</div><div class="sl">Total</div></div>
+          <div class="sc"><div class="sv" style="color:var(--danger)">${ncTotal}</div><div class="sl">NC Totales</div></div>
+        </div>
+      </div>`;
+    })()}`;
 }
 function renderAdminUsuarios(tc){
   const rolCfg={admin:{cls:'b-new',lbl:'Admin'},jefe:{cls:'b-pen',lbl:'Jefe'},planificador:{cls:'b-run',lbl:'Planificador'},supervisor:{cls:'b-don',lbl:'Supervisor'}};
