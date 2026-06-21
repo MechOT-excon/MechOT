@@ -464,11 +464,16 @@ function otList(list,fn){return list.length?list.map(o=>otCard(o,fn)).join(''):`
 
 // ===================== PLANIFICADOR =====================
 function renderPlan(){
-  const tabs=['OTs','Resumen','Cumplimiento'];
+  const tabs=['OTs','Dashboard','Calendario','Equipos','Inspecciones'];
   document.getElementById('MC').innerHTML=`
     <div class="nt">${tabs.map((t,i)=>`<button class="ntb ${S.tab===i?'on':''}" onclick="setTab(${i})">${t}</button>`).join('')}</div>
     <div id="TC"></div>`;
-  [renderPlanOTs,renderResumen,renderCumplimiento][S.tab](document.getElementById('TC'));
+  [renderPlanOTs, renderPlanDash, renderCalendario, renderEquipos, renderAdminInspecciones][S.tab](document.getElementById('TC'));
+}
+
+function renderPlanDash(tc){
+  // Reutiliza la misma lógica del Jefe pero solo lectura
+  renderJefeDash(tc);
 }
 function renderPlanOTs(tc){
   const vis=visibleOTs();
