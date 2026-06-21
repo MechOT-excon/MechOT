@@ -2301,18 +2301,43 @@ function renderJefeDash(tc){
   });
 
   function tablaKPI(k){
-    const aTiempo=k.proceso+k.disp+k.ruta;
     const sitioFiltro=k.nombre||'todos';
     return `<table style="width:100%;border-collapse:collapse;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
+      <!-- Fila 1: Total -->
       <tr>
         <td colspan="4" style="border:1px solid var(--border);padding:8px 10px;background:var(--bg3);text-align:center;cursor:pointer" onclick="verListaEquipos('todos','${sitioFiltro}')">
-          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Total equipos esta semana</div>
-          <div style="font-size:22px;font-weight:500;color:var(--text);font-family:var(--fm)">${k.total||k.proceso+k.disp+k.ruta+k.entSemana}</div>
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Total equipos</div>
+          <div style="font-size:22px;font-weight:500;color:var(--text);font-family:var(--fm)">${k.proceso+k.disp+k.ruta+k.entSemana}</div>
+        </td>
+      </tr>
+      <!-- Fila 2: 4 estados -->
+      <tr>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('En Proceso','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En proceso</div>
+          <div style="font-size:18px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('Disponible','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Disponibles</div>
+          <div style="font-size:18px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('En Ruta','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En ruta</div>
+          <div style="font-size:18px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('entregados_sem','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Entregados sem.</div>
+          <div style="font-size:18px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
+        </td>
+      </tr>
+      <!-- Fila 3: desglose de En Proceso -->
+      <tr>
+        <td colspan="4" style="border:1px solid var(--border);padding:3px 8px;background:var(--bg3)">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Desglose equipos en proceso (${k.proceso})</div>
         </td>
       </tr>
       <tr>
         <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('conFecha','${sitioFiltro}')">
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Compromiso vigente</div>
+          <div style="font-size:9px;color:var(--acc3);text-transform:uppercase;letter-spacing:.3px">Comp. vigente</div>
           <div style="font-size:16px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.conFecha}</div>
         </td>
         <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;background:rgba(239,68,68,.06);cursor:pointer" onclick="verListaEquipos('atrasados','${sitioFiltro}')">
@@ -2324,24 +2349,7 @@ function renderJefeDash(tc){
           <div style="font-size:16px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.sinFecha}</div>
         </td>
       </tr>
-      <tr>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('En Proceso','${sitioFiltro}')">
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En proceso</div>
-          <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
-        </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('Disponible','${sitioFiltro}')">
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Disponibles</div>
-          <div style="font-size:16px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
-        </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('En Ruta','${sitioFiltro}')">
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En ruta</div>
-          <div style="font-size:16px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
-        </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('entregados_sem','${sitioFiltro}')">
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Entregados sem.</div>
-          <div style="font-size:16px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
-        </td>
-      </tr>
+      <!-- Fila 4: compromisos -->
       <tr>
         <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:var(--bg3)">
           <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Compromisos esta semana</div>
@@ -3062,18 +3070,40 @@ function renderAdminKPIs(tc){
   }
 
   function tablaKPIAdmin(k){
-    const aTiempo=k.proceso+k.disp+k.ruta;
     const sitioFiltro=k.nombre||'todos';
     return `<table style="width:100%;border-collapse:collapse;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
       <tr>
-        <td colspan="4" style="border:1px solid var(--border);padding:8px 10px;background:var(--bg3);text-align:center">
-          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Total equipos esta semana</div>
-          <div style="font-size:22px;font-weight:500;color:var(--text);font-family:var(--fm)">${k.total||k.proceso+k.disp+k.ruta+k.entSemana}</div>
+        <td colspan="4" style="border:1px solid var(--border);padding:8px 10px;background:var(--bg3);text-align:center;cursor:pointer" onclick="verListaEquipos('todos','${sitioFiltro}')">
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Total equipos</div>
+          <div style="font-size:22px;font-weight:500;color:var(--text);font-family:var(--fm)">${k.proceso+k.disp+k.ruta+k.entSemana}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('En Proceso','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En proceso</div>
+          <div style="font-size:18px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('Disponible','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Disponibles</div>
+          <div style="font-size:18px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('En Ruta','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En ruta</div>
+          <div style="font-size:18px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('entregados_sem','${sitioFiltro}')">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Entregados sem.</div>
+          <div style="font-size:18px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="4" style="border:1px solid var(--border);padding:3px 8px;background:var(--bg3)">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Desglose equipos en proceso (${k.proceso})</div>
         </td>
       </tr>
       <tr>
         <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick="verListaEquipos('conFecha','${sitioFiltro}')">
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Compromiso vigente</div>
+          <div style="font-size:9px;color:var(--acc3);text-transform:uppercase;letter-spacing:.3px">Comp. vigente</div>
           <div style="font-size:16px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.conFecha}</div>
         </td>
         <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;background:rgba(239,68,68,.06);cursor:pointer" onclick="verListaEquipos('atrasados','${sitioFiltro}')">
@@ -3086,25 +3116,6 @@ function renderAdminKPIs(tc){
         </td>
       </tr>
       <tr>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick=\"verListaEquipos('En Proceso','${sitioFiltro}')\">
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En proceso</div>
-          <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
-        </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick=\"verListaEquipos('Disponible','${sitioFiltro}')\">
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Disponibles</div>
-          <div style="font-size:16px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
-        </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick=\"verListaEquipos('En Ruta','${sitioFiltro}')\">
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En ruta</div>
-          <div style="font-size:16px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
-        </td>
-        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center;cursor:pointer" onclick=\"verListaEquipos('entregados_sem','${sitioFiltro}')\">
-          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Entregados sem.</div>
-          <div style="font-size:16px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
-        </td>
-      </tr>
-
-      <tr>
         <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:var(--bg3)">
           <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Compromisos esta semana</div>
           <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.metaSem}</div>
@@ -3116,6 +3127,7 @@ function renderAdminKPIs(tc){
       </tr>
     </table>`;
   }
+
 
   const areaActual=S.areaFiltro||'todos';
   const eqBase=areaActual==='todos'?S.equipos:S.equipos.filter(e=>e.area===areaActual);
