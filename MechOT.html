@@ -2284,123 +2284,54 @@ function renderJefeDash(tc){
     return {...k,nombre:s,total:eqS.length};
   });
 
-  function kpiBlocks(k){
-    return `
-      <!-- Fila 1: En Proceso + Atrasados -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div style="border:1.5px solid var(--acc2);border-radius:10px;padding:10px 12px">
-          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-tool"></i> En Proceso</div>
-          <div style="font-size:28px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
-        </div>
-        <div style="border:1.5px solid var(--danger);border-radius:10px;padding:10px 12px;background:rgba(239,68,68,.05)">
-          <div style="font-size:10px;font-weight:500;color:var(--danger);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-alert-triangle"></i> Atrasados</div>
-          <div style="font-size:28px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.atrasados}</div>
-        </div>
-      </div>
-      <!-- Fila 2: Disponibles + En Ruta + Entregados semana -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:10px">
-        <div style="border:1.5px solid var(--acc3);border-radius:10px;padding:10px 10px">
-          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-circle-check"></i> Disponibles</div>
-          <div style="font-size:24px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
-        </div>
-        <div style="border:1.5px solid #ef9f27;border-radius:10px;padding:10px 10px">
-          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-truck"></i> En Ruta</div>
-          <div style="font-size:24px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
-        </div>
-        <div style="border:1.5px solid #7f77dd;border-radius:10px;padding:10px 10px">
-          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-flag"></i> Entregados sem.</div>
-          <div style="font-size:24px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
-        </div>
-      </div>
-      <!-- Fila 3: Compromisos esta semana + próxima -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div style="border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px">
-          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-calendar-week"></i> Esta semana</div>
-          <div style="font-size:24px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.metaSem}</div>
-          <div style="font-size:10px;color:var(--text2);margin-top:2px">compromisos</div>
-        </div>
-        <div style="border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px">
-          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-calendar"></i> Próxima semana</div>
-          <div style="font-size:24px;font-weight:500;color:var(--text2);font-family:var(--fm)">${k.proxSem}</div>
-          <div style="font-size:10px;color:var(--text2);margin-top:2px">compromisos</div>
-        </div>
-      </div>`;
-  }
-
-  function semanaBlock(k){
-    const max=k.metaSem||1;
-    const barEnt=Math.round(k.entSemana/max*100);
-    const barRut=Math.round(k.rutaSem/max*100);
-    const barDis=Math.round(k.dispSem/max*100);
-    const barPen=Math.round(k.pendSem/max*100);
-    return `<div style="border:1.5px solid var(--border);border-radius:10px;padding:12px;margin-bottom:8px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <span style="font-size:12px;font-weight:500;color:var(--text)">Meta semanal: <strong>${k.metaSem}</strong> equipos</span>
-        <span style="font-size:13px;font-weight:500;color:var(--acc3)">${k.pctSem}%</span>
-      </div>
-      <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${k.entSemana} de ${k.metaSem} entregados</div>
-      ${pbw(k.pctSem)}
-      <div style="border-top:1px dashed var(--border);margin:10px 0 7px"></div>
-      <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:7px">¿Cómo vamos?</div>
-      ${[
-        {lbl:'Entregados',n:k.entSemana,pct:barEnt,col:'#7f77dd'},
-        {lbl:'En Ruta',n:k.rutaSem,pct:barRut,col:'#ef9f27'},
-        {lbl:'Disponibles',n:k.dispSem,pct:barDis,col:var_acc3()},
-        {lbl:'Pendientes',n:k.pendSem,pct:barPen,col:'var(--acc2)'},
-      ].map(r=>`<div style="display:flex;align-items:center;gap:7px;padding:3px 0">
-        <div style="width:8px;height:8px;border-radius:2px;flex-shrink:0;background:${r.col}"></div>
-        <span style="font-size:12px;flex:1;color:var(--text)">${r.lbl}</span>
-        <div style="flex:0 0 70px;background:var(--bg3);border-radius:2px;height:5px;overflow:hidden">
-          <div style="height:100%;width:${r.pct}%;background:${r.col}"></div>
-        </div>
-        <span style="font-size:13px;font-weight:500;min-width:18px;text-align:right;color:${r.col}">${r.n}</span>
-      </div>`).join('')}
-    </div>
-    <div style="border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <div>
-        <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Próxima semana</div>
-        <div style="font-size:12px;color:var(--text);margin-top:2px">Compromisos pendientes</div>
-      </div>
-      <div style="font-size:26px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proxSem}</div>
-    </div>`;
-  }
-
-  function var_acc3(){return '#1d9e75';}
-
-  function sitioBlocks(list){
-    return list.filter(s=>s.total>0).map(s=>`
-      <div style="border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:13px;font-weight:500;color:var(--text)">${s.nombre}</span>
-          <span style="font-size:11px;color:var(--text2)">${s.total} equipos</span>
-        </div>
-        <!-- Fila 1: En Proceso + Atrasados -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-          <div style="border:1px solid var(--acc2);border-radius:8px;padding:8px 10px">
-            <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-tool"></i> En Proceso</div>
-            <div style="font-size:22px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${s.proceso}</div>
-          </div>
-          <div style="border:1px solid var(--danger);border-radius:8px;padding:8px 10px;background:rgba(239,68,68,.04)">
-            <div style="font-size:9px;color:var(--danger);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-alert-triangle"></i> Atrasados</div>
-            <div style="font-size:22px;font-weight:500;color:var(--danger);font-family:var(--fm)">${s.atrasados}</div>
-          </div>
-        </div>
-        <!-- Fila 2: Disponibles + En Ruta + Entregados sem -->
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-          <div style="border:1px solid var(--acc3);border-radius:8px;padding:7px 8px">
-            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-circle-check"></i> Disponibles</div>
-            <div style="font-size:18px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${s.disp}</div>
-          </div>
-          <div style="border:1px solid #ef9f27;border-radius:8px;padding:7px 8px">
-            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-truck"></i> En Ruta</div>
-            <div style="font-size:18px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${s.ruta}</div>
-          </div>
-          <div style="border:1px solid #7f77dd;border-radius:8px;padding:7px 8px">
-            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-flag"></i> Entregados</div>
-            <div style="font-size:18px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${s.entSemana}</div>
-          </div>
-        </div>
-      </div>`).join('');
+  function tablaKPI(k){
+    const aTiempo=k.proceso+k.disp+k.ruta;
+    return `<table style="width:100%;border-collapse:collapse;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
+      <tr>
+        <td colspan="4" style="border:1px solid var(--border);padding:8px 10px;background:var(--bg3);text-align:center">
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Total equipos esta semana</div>
+          <div style="font-size:22px;font-weight:500;color:var(--text);font-family:var(--fm)">${k.total||aTiempo+k.atrasados}</div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center">
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">A tiempo</div>
+          <div style="font-size:18px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${aTiempo}</div>
+        </td>
+        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:rgba(239,68,68,.06)">
+          <div style="font-size:10px;color:var(--danger);text-transform:uppercase;letter-spacing:.4px">Atrasados</div>
+          <div style="font-size:18px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.atrasados}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En proceso</div>
+          <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Disponibles</div>
+          <div style="font-size:16px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En ruta</div>
+          <div style="font-size:16px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Entregados sem.</div>
+          <div style="font-size:16px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:var(--bg3)">
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Compromisos esta semana</div>
+          <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.metaSem}</div>
+        </td>
+        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:var(--bg3)">
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Compromisos próx. semana</div>
+          <div style="font-size:16px;font-weight:500;color:var(--text2);font-family:var(--fm)">${k.proxSem}</div>
+        </td>
+      </tr>
+    </table>`;
   }
 
   // Tabs de área
@@ -2408,7 +2339,13 @@ function renderJefeDash(tc){
   const eqBase=areaTab==='todos'?eqVis:S.equipos.filter(e=>e.area===areaTab&&(S.role==='admin'||e.sucursal===S.userSitio));
   const comBase=areaTab==='todos'?comsVis:S.compromisos.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.area===areaTab&&(S.role==='admin'||eq.sucursal===S.userSitio);});
   const kActual=areaTab==='todos'?kTodos:dashKPIs(eqBase,comBase);
-  const sitioActual=sitioData; // siempre muestra ambos sitios
+  kActual.total=eqBase.length;
+  const sitioActual=sitios.map(s=>{
+    const eqS=eqBase.filter(e=>e.sucursal===s);
+    const comS=comBase.filter(c=>{const eq=getEq(c.equipo_cod);return eq?.sucursal===s;});
+    const k=dashKPIs(eqS,comS);
+    return {...k,nombre:s,total:eqS.length};
+  });
 
   tc.innerHTML=`
     <!-- ÁREA TABS -->
@@ -2420,19 +2357,18 @@ function renderJefeDash(tc){
       </div>`).join('')}
     </div>
 
-    <!-- KPIs ESTADO -->
+    <!-- TABLA GENERAL -->
     <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px">
       <i class="ti ti-tool"></i> Estado actual${areaTab!=='todos'?' — '+areaTab:''}
     </div>
-    ${kpiBlocks(kActual)}
-
-    <!-- META SEMANAL -->
-    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-calendar-week"></i> Compromisos — esta semana</div>
-    ${semanaBlock(kActual)}
+    ${tablaKPI(kActual)}
 
     <!-- POR SITIO -->
-    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-map-pin"></i> Por sitio${areaTab!=='todos'?' — '+areaTab:''}</div>
-    ${sitioBlocks(sitioActual)}
+    ${sitioActual.filter(s=>s.total>0).map(s=>`
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px">
+      <i class="ti ti-map-pin"></i> ${s.nombre}
+    </div>
+    ${tablaKPI(s)}`).join('')}
 
     <!-- ATRASADOS DETALLE -->
     ${kActual.atrasados>0?`
@@ -2927,85 +2863,57 @@ function renderAdminKPIs(tc){
     const comsSem=comList.filter(c=>c.estado!=='Entregado');
     const metaSem=comsSem.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length;
     const proxSem=comsSem.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr).length;
-    const rutaSem=comsSem.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq?.estado_equipo==='En Ruta'&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;}).length;
-    const dispSem=comsSem.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq?.estado_equipo==='Disponible'&&c.fecha_limite>=lunStr&&c.fecha_limite<=domStr;}).length;
-    const pendSem=metaSem;
-    const pctSem=metaSem?Math.min(100,Math.round(entSemana/metaSem*100)):0;
-    return {proceso,disp,ruta,atrasados,entSemana,metaSem,proxSem,rutaSem,dispSem,pendSem,pctSem};
+    return {proceso,disp,ruta,atrasados,entSemana,metaSem,proxSem};
   }
 
-  function kpiBlocksA(k){
-    return `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
-        <div style="border:1.5px solid var(--acc2);border-radius:10px;padding:10px 12px">
-          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-tool"></i> En Proceso</div>
-          <div style="font-size:28px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
-        </div>
-        <div style="border:1.5px solid var(--danger);border-radius:10px;padding:10px 12px;background:rgba(239,68,68,.05)">
-          <div style="font-size:10px;font-weight:500;color:var(--danger);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-alert-triangle"></i> Atrasados</div>
-          <div style="font-size:28px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.atrasados}</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px">
-        <div style="border:1.5px solid var(--acc3);border-radius:10px;padding:10px 10px">
-          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-circle-check"></i> Disponibles</div>
-          <div style="font-size:24px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
-        </div>
-        <div style="border:1.5px solid #ef9f27;border-radius:10px;padding:10px 10px">
-          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-truck"></i> En Ruta</div>
-          <div style="font-size:24px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
-        </div>
-        <div style="border:1.5px solid #7f77dd;border-radius:10px;padding:10px 10px">
-          <div style="font-size:9px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-flag"></i> Entregados sem.</div>
-          <div style="font-size:24px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
-        </div>
-      </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
-        <div style="border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px">
-          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-calendar-week"></i> Esta semana</div>
-          <div style="font-size:24px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.metaSem}</div>
-          <div style="font-size:10px;color:var(--text2);margin-top:2px">compromisos</div>
-        </div>
-        <div style="border:1.5px dashed var(--border);border-radius:10px;padding:10px 12px">
-          <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px"><i class="ti ti-calendar"></i> Próxima semana</div>
-          <div style="font-size:24px;font-weight:500;color:var(--text2);font-family:var(--fm)">${k.proxSem}</div>
-          <div style="font-size:10px;color:var(--text2);margin-top:2px">compromisos</div>
-        </div>
-      </div>`;
-  }
-
-  function sitioBlocksA(list){
-    return list.filter(s=>s.total>0).map(s=>`
-      <div style="border:1.5px solid var(--border);border-radius:10px;padding:10px 12px;margin-bottom:8px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-          <span style="font-size:13px;font-weight:500;color:var(--text)">${s.nombre}</span>
-          <span style="font-size:11px;color:var(--text2)">${s.total} equipos</span>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:6px">
-          <div style="border:1px solid var(--acc2);border-radius:8px;padding:8px 10px">
-            <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-tool"></i> En Proceso</div>
-            <div style="font-size:22px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${s.proceso}</div>
-          </div>
-          <div style="border:1px solid var(--danger);border-radius:8px;padding:8px 10px;background:rgba(239,68,68,.04)">
-            <div style="font-size:9px;color:var(--danger);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-alert-triangle"></i> Atrasados</div>
-            <div style="font-size:22px;font-weight:500;color:var(--danger);font-family:var(--fm)">${s.atrasados}</div>
-          </div>
-        </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
-          <div style="border:1px solid var(--acc3);border-radius:8px;padding:7px 8px">
-            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-circle-check"></i> Disponibles</div>
-            <div style="font-size:18px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${s.disp}</div>
-          </div>
-          <div style="border:1px solid #ef9f27;border-radius:8px;padding:7px 8px">
-            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-truck"></i> En Ruta</div>
-            <div style="font-size:18px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${s.ruta}</div>
-          </div>
-          <div style="border:1px solid #7f77dd;border-radius:8px;padding:7px 8px">
-            <div style="font-size:8px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:3px"><i class="ti ti-flag"></i> Entregados</div>
-            <div style="font-size:18px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${s.entSemana}</div>
-          </div>
-        </div>
-      </div>`).join('');
+  function tablaKPIAdmin(k){
+    const aTiempo=k.proceso+k.disp+k.ruta;
+    return `<table style="width:100%;border-collapse:collapse;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px">
+      <tr>
+        <td colspan="4" style="border:1px solid var(--border);padding:8px 10px;background:var(--bg3);text-align:center">
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Total equipos esta semana</div>
+          <div style="font-size:22px;font-weight:500;color:var(--text);font-family:var(--fm)">${k.total||aTiempo+k.atrasados}</div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center">
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">A tiempo</div>
+          <div style="font-size:18px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${aTiempo}</div>
+        </td>
+        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:rgba(239,68,68,.06)">
+          <div style="font-size:10px;color:var(--danger);text-transform:uppercase;letter-spacing:.4px">Atrasados</div>
+          <div style="font-size:18px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.atrasados}</div>
+        </td>
+      </tr>
+      <tr>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En proceso</div>
+          <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.proceso}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Disponibles</div>
+          <div style="font-size:16px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${k.disp}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">En ruta</div>
+          <div style="font-size:16px;font-weight:500;color:#ef9f27;font-family:var(--fm)">${k.ruta}</div>
+        </td>
+        <td style="border:1px solid var(--border);padding:7px 6px;text-align:center">
+          <div style="font-size:9px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px">Entregados sem.</div>
+          <div style="font-size:16px;font-weight:500;color:#7f77dd;font-family:var(--fm)">${k.entSemana}</div>
+        </td>
+      </tr>
+      <tr>
+        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:var(--bg3)">
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Compromisos esta semana</div>
+          <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.metaSem}</div>
+        </td>
+        <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:var(--bg3)">
+          <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Compromisos próx. semana</div>
+          <div style="font-size:16px;font-weight:500;color:var(--text2);font-family:var(--fm)">${k.proxSem}</div>
+        </td>
+      </tr>
+    </table>`;
   }
 
   const areaActual=S.areaFiltro||'todos';
@@ -3015,15 +2923,13 @@ function renderAdminKPIs(tc){
     return eq&&eq.area===areaActual;
   });
   const kActual=dashKPIsAdmin(eqBase,comBase);
-
-  const sitioData=['Lo Pinto','La Negra'].map(nombre=>{
+  kActual.total=eqBase.length;
+  const sitioDataAdmin=['Lo Pinto','La Negra'].map(nombre=>{
     const eqS=eqBase.filter(e=>e.sucursal===nombre);
     const comS=comBase.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq?.sucursal===nombre;});
     const k=dashKPIsAdmin(eqS,comS);
     return {...k,nombre,total:eqS.length};
   });
-
-  // Atrasados detalle por mes
   const comsAtrasCorr=comBase.filter(c=>{
     if(c.estado==='Entregado') return false;
     const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
@@ -3045,18 +2951,15 @@ function renderAdminKPIs(tc){
         ${a==='todos'?'Todos':a}
       </div>`).join('')}
     </div>
-
-    <!-- KPIs -->
     <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px">
       <i class="ti ti-tool"></i> Estado actual${areaActual!=='todos'?' — '+areaActual:''}
     </div>
-    ${kpiBlocksA(kActual)}
-
-    <!-- POR SITIO -->
-    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-map-pin"></i> Por sitio${areaActual!=='todos'?' — '+areaActual:''}</div>
-    ${sitioBlocksA(sitioData)}
-
-    <!-- ATRASADOS DETALLE -->
+    ${tablaKPIAdmin(kActual)}
+    ${sitioDataAdmin.filter(s=>s.total>0).map(s=>`
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px">
+      <i class="ti ti-map-pin"></i> ${s.nombre}
+    </div>
+    ${tablaKPIAdmin(s)}`).join('')}
     ${kActual.atrasados>0?`
     <div style="font-size:10px;font-weight:500;color:var(--danger);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:rgba(239,68,68,.08);border-radius:8px;margin-bottom:8px"><i class="ti ti-alert-triangle"></i> Detalle de atrasados</div>
     ${Object.entries(atrasosPorMes).sort().map(([mes,lista])=>{
