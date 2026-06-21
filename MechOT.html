@@ -833,22 +833,16 @@ async function openSupOT(id_ot){
               style="width:65px;background:var(--bg2);border:1px solid var(--border);border-radius:5px;padding:3px 6px;color:var(--text);font-size:12px;font-family:var(--fm)">
             <span style="font-size:10px;color:var(--text3)">horas reales</span>
           </div>
-          <!-- Foto tarea — sube inmediatamente -->
+          <!-- Foto tarea — mismo patrón que inspección (probado iOS) -->
           <div style="padding-left:1.7rem">
-            ${t.foto_url_subida?
-              `<div style="display:flex;align-items:center;gap:.4rem;font-size:11px;color:var(--acc3)">
-                <i class="ti ti-photo-check"></i> Foto subida ✓
-                <a href="${t.foto_url_subida}" target="_blank" style="color:var(--acc2);font-size:10px">ver</a>
-              </div>`:
-              `<div style="position:relative;display:inline-flex;align-items:center;gap:.3rem;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg2);cursor:pointer" id="btn-ft-${i}">
-                <input type="file" accept="image/*" capture="environment"
-                  onchange="subirFotoTareaInmediato('${id_ot}',${i},this)"
-                  style="position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer">
-                <i class="ti ti-camera" style="font-size:12px;color:var(--text3)"></i>
-                <span style="font-size:10px;color:var(--text3)">Foto (opcional)</span>
-              </div>`
-            }
-            <div id="upload-status-${i}" style="font-size:10px;color:var(--acc);margin-top:.2rem"></div>
+            <div class="ncph ${_fotosTareasURL[String(i)]?'up':''}" onclick="document.getElementById('ft-${id_ot}-${i}').click()" style="margin-top:.25rem">
+              <input type="file" id="ft-${id_ot}-${i}" accept="image/*" capture="environment"
+                onchange="handleFotoTareaOT('${id_ot}',${i},this)">
+              ${_fotosTareasURL[String(i)]?
+                `<i class="ti ti-photo-check"></i> Foto ✓ <a href="${_fotosTareasURL[String(i)]}" target="_blank" style="font-size:10px;margin-left:.3rem">ver</a>`:
+                '<i class="ti ti-camera"></i> Foto (opcional)'}
+            </div>
+            <div id="ft-status-${i}" style="font-size:10px;color:var(--acc);margin-top:.2rem"></div>
           </div>
         </div>`).join('')}
       </div>
@@ -929,39 +923,37 @@ function handleFotoAvance(inp){
   _fotoAvanceFile=inp.files[0];
 }
 
-// Fotos por tarea — URLs ya subidas inmediatamente
+// Fotos por tarea — URLs ya subidas
 let _fotosTareasURL={};
-let _fotosTareas={}; // mantener por compatibilidad
+let _fotosTareas={}; // compatibilidad
 
-// Sube la foto de una tarea INMEDIATAMENTE al seleccionarla
-async function subirFotoTareaInmediato(id_ot, idx, inp){
+// Maneja foto de tarea OT — mismo patrón que inspección
+function handleFotoTareaOT(id_ot, idx, inp){
   if(!inp.files||!inp.files[0]) return;
-  const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
-  const statusEl=document.getElementById(`upload-status-${idx}`);
-  const btnEl=document.getElementById(`btn-ft-${idx}`);
+  const statusEl=document.getElementById(`ft-status-${idx}`);
+  const btn=inp.parentElement;
   if(statusEl) statusEl.textContent='⏳ Subiendo...';
-  try{
-    const comp=await comprimirImagen(inp.files[0]);
-    const ts=new Date().toISOString().replace(/[:.]/g,'-');
-    const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/tarea${idx}_${ts}.jpg`;
-    const url=await uploadConReintento(path,comp);
-    _fotosTareasURL[String(idx)]=url;
-    if(btnEl){
-      btnEl.innerHTML=`<i class="ti ti-photo-check" style="font-size:12px;color:var(--acc3)"></i>
-        <span style="font-size:10px;color:var(--acc3)">Foto ✓</span>
-        <a href="${url}" target="_blank" style="font-size:10px;color:var(--acc2);margin-left:.3rem">ver</a>`;
-      btnEl.style.borderColor='rgba(16,185,129,.4)';
-      btnEl.style.background='rgba(16,185,129,.08)';
+  if(btn) btn.classList.add('up');
+  comprimirImagen(inp.files[0]).then(async comp=>{
+    try{
+      const o=S.ots.find(x=>x.id_ot===id_ot); const eq=getEq(o.equipo_cod);
+      const ts=new Date().toISOString().replace(/[:.]/g,'-');
+      const path=`${eq.codigo_interno}/${id_ot}_${o.nombre.replace(/\s+/g,'_')}/tarea${idx}_${ts}.jpg`;
+      const url=await uploadConReintento(path,comp);
+      _fotosTareasURL[String(idx)]=url;
+      if(btn){
+        btn.innerHTML=`<input type="file" id="ft-${id_ot}-${idx}" accept="image/*" capture="environment"
+          onchange="handleFotoTareaOT('${id_ot}',${idx},this)" style="display:none">
+          <i class="ti ti-photo-check"></i> Foto ✓
+          <a href="${url}" target="_blank" style="font-size:10px;margin-left:.3rem">ver</a>`;
+      }
+      if(statusEl) statusEl.textContent='';
+    }catch(e){
+      if(btn) btn.classList.remove('up');
+      if(statusEl) statusEl.textContent='⚠ Error, intenta de nuevo';
     }
-    if(statusEl) statusEl.textContent='';
-  }catch(e){
-    if(statusEl) statusEl.textContent='⚠ Error, intenta de nuevo';
-    addAlert('warn',`Foto tarea ${idx+1} — OT ${id_ot}`,'No se pudo subir.');
-  }
+  });
 }
-
-// Mantener handleFotoTarea por si acaso
-function handleFotoTarea(idx,inp){subirFotoTareaInmediato(document.querySelector('[id^="tarea-card-"]')?.id?.split('-')[2]||'',idx,inp);}
 
 
 async function handleFotoCierre(id_ot,inp){
@@ -1562,9 +1554,15 @@ async function saveChecklist(){
   try{
     const res=await supa.post('inspecciones',insp);
     S.inspecciones.unshift(res[0]);
+    // Actualizar req_habilitacion automáticamente
+    const reqHab=ncs.length>0?'pendiente':'ok';
+    await supa.patch('equipos',`codigo_interno=eq.${st.equipoCod}`,{req_habilitacion:reqHab});
+    const eqObj=S.equipos.find(e=>e.codigo_interno===st.equipoCod);
+    if(eqObj) eqObj.req_habilitacion=reqHab;
+    if(ncs.length>0) addAlert('warn',`Checklist ${getEq(st.equipoCod).nombre}`,`${ncs.length} NC en habilitación — req. pendiente`);
     _fotos4lados={der:null,izq:null,front:null,post:null};
     cm('m-eval'); renderRole();
-    alert(`✓ Checklist guardado\n✓ ${conformes} OK · ✗ ${ncs.length} NC`);
+    alert(`✓ Checklist guardado\n✓ ${conformes} OK · ✗ ${ncs.length} NC\n\nReq. habilitación: ${reqHab==='ok'?'✅ OK':'⚠ Pendiente NC'}`);
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -1895,10 +1893,20 @@ async function saveEval(){
   try{
     const res=await supa.post('inspecciones',inspData);
     S.inspecciones.unshift(res[0]);
-    if(ncs.length>0) addAlert('crit',`${st.tipoInsp} ${eq.nombre}`,`${ncs.length} no conforme(s)`);
+    // Actualizar req_mecanica del equipo automáticamente
+    const reqMec=ncs.length>0?'pendiente':'ok';
+    await supa.patch('equipos',`codigo_interno=eq.${st.equipoCod}`,{req_mecanica:reqMec});
+    const eqObj=S.equipos.find(e=>e.codigo_interno===st.equipoCod);
+    if(eqObj) eqObj.req_mecanica=reqMec;
+    // Alertar si hay NC
+    if(ncs.length>0){
+      addAlert('crit',`${st.tipoInsp} ${eq.nombre}`,`${ncs.length} no conforme(s) — req. mecánica pendiente`);
+    } else {
+      addAlert('info',`${st.tipoInsp} ${eq.nombre}`,'Evaluación mecánica OK');
+    }
     generarPDFInspeccion(idInsp,eq,st,realItems,ncs,inspData).catch(e=>console.warn('PDF insp error:',e));
     cm('m-eval'); renderRole();
-    alert(`✓ Inspección guardada\n✓ ${conformes} Bueno · ✗ ${ncs.length} NC · ${inspData.total_na} NA${fotosFallidas.length?`\n⚠ ${fotosFallidas.length} foto(s) no subidas`:''}`);
+    alert(`✓ Inspección guardada\n✓ ${conformes} Bueno · ✗ ${ncs.length} NC · ${inspData.total_na} NA${fotosFallidas.length?`\n⚠ ${fotosFallidas.length} foto(s) no subidas`:''}\n\nReq. mecánica: ${reqMec==='ok'?'✅ OK':'⚠ Pendiente NC'}`);
   }catch(e){alert('Error: '+e.message);}
 }
 
@@ -2322,6 +2330,16 @@ function renderJefeDash(tc){
         </td>
       </tr>
       <tr>
+        <td colspan="2" style="border:1px solid var(--border);padding:7px 8px;text-align:center;background:rgba(239,68,68,.04)">
+          <div style="font-size:9px;color:var(--danger);text-transform:uppercase;letter-spacing:.3px">🔧 Falta eval. mecánica</div>
+          <div style="font-size:16px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.faltaMec||0}</div>
+        </td>
+        <td colspan="2" style="border:1px solid var(--border);padding:7px 8px;text-align:center;background:rgba(239,68,68,.04)">
+          <div style="font-size:9px;color:var(--danger);text-transform:uppercase;letter-spacing:.3px">📋 Falta checklist hab.</div>
+          <div style="font-size:16px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.faltaHab||0}</div>
+        </td>
+      </tr>
+      <tr>
         <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:var(--bg3)">
           <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Compromisos esta semana</div>
           <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.metaSem}</div>
@@ -2340,11 +2358,17 @@ function renderJefeDash(tc){
   const comBase=areaTab==='todos'?comsVis:S.compromisos.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq&&eq.area===areaTab&&(S.role==='admin'||eq.sucursal===S.userSitio);});
   const kActual=areaTab==='todos'?kTodos:dashKPIs(eqBase,comBase);
   kActual.total=eqBase.length;
+  // Falta evaluar — equipos En Proceso sin req
+  kActual.faltaMec=eqBase.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&e.area!=='Repex'&&!e.req_mecanica).length;
+  kActual.faltaHab=eqBase.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&e.area==='Habilitación'&&!e.req_habilitacion).length;
   const sitioActual=sitios.map(s=>{
     const eqS=eqBase.filter(e=>e.sucursal===s);
     const comS=comBase.filter(c=>{const eq=getEq(c.equipo_cod);return eq?.sucursal===s;});
     const k=dashKPIs(eqS,comS);
-    return {...k,nombre:s,total:eqS.length};
+    k.total=eqS.length;
+    k.faltaMec=eqS.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&e.area!=='Repex'&&!e.req_mecanica).length;
+    k.faltaHab=eqS.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&e.area==='Habilitación'&&!e.req_habilitacion).length;
+    return {...k,nombre:s};
   });
 
   tc.innerHTML=`
@@ -2584,7 +2608,59 @@ function openEqDetail(cod){
       </div>
     </div>`:''}
 
-    <div class="sg">
+    <!-- REQUISITOS PARA DISPONIBLE -->
+    <div class="card" style="margin-bottom:.65rem">
+      <div class="ct" style="margin-bottom:.5rem"><i class="ti ti-checklist" style="color:var(--acc4)"></i> Requisitos para Disponible</div>
+      ${(()=>{
+        const area=e.area||'Habilitación';
+        const reqMec=e.req_mecanica;
+        const reqHab=e.req_habilitacion;
+        const colorReq=v=>v==='ok'?'var(--acc3)':v==='pendiente'?'var(--danger)':'#94a3b8';
+        const iconReq=v=>v==='ok'?'ti-circle-check':v==='pendiente'?'ti-alert-triangle':'ti-circle-dashed';
+        const lblReq=v=>v==='ok'?'OK':v==='pendiente'?'Con NC pendientes':'Sin evaluar';
+        const rows=[];
+        // Mecánica siempre (excepto Repex)
+        if(area!=='Repex'){
+          rows.push(`<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0;border-bottom:1px solid var(--border)">
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <i class="ti ${iconReq(reqMec)}" style="color:${colorReq(reqMec)};font-size:16px"></i>
+              <div>
+                <div style="font-size:12px;font-weight:500">Evaluación Mecánica</div>
+                <div style="font-size:10px;color:${colorReq(reqMec)}">${lblReq(reqMec)}</div>
+              </div>
+            </div>
+            ${S.role==='admin'?`<div style="display:flex;gap:.3rem">
+              ${['ok','pendiente',null].map(v=>`<button class="btn bsm" onclick="cambiarReq('${cod}','req_mecanica',${v===null?'null':`'${v}'`})"
+                style="${reqMec===v?`background:${colorReq(v)};color:#fff;border-color:${colorReq(v)}`:'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'};font-size:9px;padding:2px 6px">
+                ${v==='ok'?'OK':v==='pendiente'?'NC':'—'}
+              </button>`).join('')}
+            </div>`:''}
+          </div>`);
+        }
+        // Habilitación solo para Habilitación
+        if(area==='Habilitación'){
+          rows.push(`<div style="display:flex;justify-content:space-between;align-items:center;padding:.4rem 0">
+            <div style="display:flex;align-items:center;gap:.5rem">
+              <i class="ti ${iconReq(reqHab)}" style="color:${colorReq(reqHab)};font-size:16px"></i>
+              <div>
+                <div style="font-size:12px;font-weight:500">Checklist Habilitación</div>
+                <div style="font-size:10px;color:${colorReq(reqHab)}">${lblReq(reqHab)}</div>
+              </div>
+            </div>
+            ${S.role==='admin'?`<div style="display:flex;gap:.3rem">
+              ${['ok','pendiente',null].map(v=>`<button class="btn bsm" onclick="cambiarReq('${cod}','req_habilitacion',${v===null?'null':`'${v}'`})"
+                style="${reqHab===v?`background:${colorReq(v)};color:#fff;border-color:${colorReq(v)}`:'background:var(--bg3);color:var(--text2);border:1px solid var(--border)'};font-size:9px;padding:2px 6px">
+                ${v==='ok'?'OK':v==='pendiente'?'NC':'—'}
+              </button>`).join('')}
+            </div>`:''}
+          </div>`);
+        }
+        if(area==='Repex'){
+          rows.push(`<div style="font-size:11px;color:var(--text2);padding:.4rem 0">Repex — requisitos definidos manualmente por Admin</div>`);
+        }
+        return rows.join('');
+      })()}
+    </div>
       <div class="sc"><div class="sv" style="color:var(--acc)">${eots.length}</div><div class="sl">OTs Total</div></div>
       <div class="sc"><div class="sv" style="color:var(--acc3)">${pct}%</div><div class="sl">Avance</div></div>
       <div class="sc"><div class="sv" style="color:var(--acc2)">${hE}h</div><div class="sl">Hrs Ejec.</div></div>
@@ -2635,6 +2711,17 @@ async function cambiarEstadoEquipo(cod, nuevoEstado){
     await supa.patch('equipos',`codigo_interno=eq.${cod}`,{estado_equipo:nuevoEstado});
     const eq=S.equipos.find(e=>e.codigo_interno===cod);
     if(eq) eq.estado_equipo=nuevoEstado;
+    openEqDetail(cod);
+  }catch(e){alert('Error: '+e.message);}
+}
+
+async function cambiarReq(cod, campo, valor){
+  try{
+    const patch={};
+    patch[campo]=valor==='null'?null:valor;
+    await supa.patch('equipos',`codigo_interno=eq.${cod}`,patch);
+    const eq=S.equipos.find(e=>e.codigo_interno===cod);
+    if(eq) eq[campo]=patch[campo];
     openEqDetail(cod);
   }catch(e){alert('Error: '+e.message);}
 }
@@ -2904,6 +2991,16 @@ function renderAdminKPIs(tc){
         </td>
       </tr>
       <tr>
+        <td colspan="2" style="border:1px solid var(--border);padding:7px 8px;text-align:center;background:rgba(239,68,68,.04)">
+          <div style="font-size:9px;color:var(--danger);text-transform:uppercase;letter-spacing:.3px">🔧 Falta eval. mecánica</div>
+          <div style="font-size:16px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.faltaMec||0}</div>
+        </td>
+        <td colspan="2" style="border:1px solid var(--border);padding:7px 8px;text-align:center;background:rgba(239,68,68,.04)">
+          <div style="font-size:9px;color:var(--danger);text-transform:uppercase;letter-spacing:.3px">📋 Falta checklist hab.</div>
+          <div style="font-size:16px;font-weight:500;color:var(--danger);font-family:var(--fm)">${k.faltaHab||0}</div>
+        </td>
+      </tr>
+      <tr>
         <td colspan="2" style="border:1px solid var(--border);padding:8px 10px;text-align:center;background:var(--bg3)">
           <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px">Compromisos esta semana</div>
           <div style="font-size:16px;font-weight:500;color:var(--acc2);font-family:var(--fm)">${k.metaSem}</div>
@@ -2916,7 +3013,6 @@ function renderAdminKPIs(tc){
     </table>`;
   }
 
-  const areaActual=S.areaFiltro||'todos';
   const eqBase=areaActual==='todos'?S.equipos:S.equipos.filter(e=>e.area===areaActual);
   const comBase=areaActual==='todos'?S.compromisos:S.compromisos.filter(c=>{
     const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);
@@ -2924,11 +3020,16 @@ function renderAdminKPIs(tc){
   });
   const kActual=dashKPIsAdmin(eqBase,comBase);
   kActual.total=eqBase.length;
+  kActual.faltaMec=eqBase.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&e.area!=='Repex'&&!e.req_mecanica).length;
+  kActual.faltaHab=eqBase.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&e.area==='Habilitación'&&!e.req_habilitacion).length;
   const sitioDataAdmin=['Lo Pinto','La Negra'].map(nombre=>{
     const eqS=eqBase.filter(e=>e.sucursal===nombre);
     const comS=comBase.filter(c=>{const eq=S.equipos.find(e=>e.codigo_interno===c.equipo_cod);return eq?.sucursal===nombre;});
     const k=dashKPIsAdmin(eqS,comS);
-    return {...k,nombre,total:eqS.length};
+    k.total=eqS.length;
+    k.faltaMec=eqS.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&e.area!=='Repex'&&!e.req_mecanica).length;
+    k.faltaHab=eqS.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&e.area==='Habilitación'&&!e.req_habilitacion).length;
+    return {...k,nombre};
   });
   const comsAtrasCorr=comBase.filter(c=>{
     if(c.estado==='Entregado') return false;
