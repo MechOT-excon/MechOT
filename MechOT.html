@@ -2595,19 +2595,25 @@ function openEqDetail(cod){
     </div>
 
     <!-- FECHA COMPROMETIDA DESTACADA -->
-    ${com?`<div class="card" style="border-color:${com.fecha_limite<hoy?'rgba(239,68,68,.5)':com.fecha_limite<=new Date(new Date(hoy).setDate(new Date(hoy).getDate()+7)).toISOString().split('T')[0]?'rgba(245,158,11,.5)':'rgba(59,130,246,.3)'};margin-bottom:.65rem">
-      <div style="display:flex;justify-content:space-between;align-items:center">
+    ${com?`<div class="card" style="border-color:${com.fecha_limite&&com.fecha_limite<hoy?'rgba(239,68,68,.5)':com.fecha_limite&&com.fecha_limite<=new Date(new Date(hoy).setDate(new Date(hoy).getDate()+7)).toISOString().split('T')[0]?'rgba(245,158,11,.5)':'rgba(59,130,246,.3)'};margin-bottom:.65rem">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.4rem">
         <div>
           <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:.2rem">Fecha compromiso de entrega</div>
-          <div style="font-size:20px;font-weight:600;font-family:var(--fm);color:${com.fecha_limite<hoy?'var(--danger)':com.fecha_limite<=new Date(new Date(hoy).setDate(new Date(hoy).getDate()+7)).toISOString().split('T')[0]?'var(--acc)':'var(--acc3)'}">${fmtDate(com.fecha_limite)}</div>
+          <div style="font-size:20px;font-weight:600;font-family:var(--fm);color:${com.fecha_limite&&com.fecha_limite<hoy?'var(--danger)':com.fecha_limite&&com.fecha_limite<=new Date(new Date(hoy).setDate(new Date(hoy).getDate()+7)).toISOString().split('T')[0]?'var(--acc)':'var(--acc3)'}">${com.fecha_limite?fmtDate(com.fecha_limite):'Sin fecha'}</div>
           <div style="font-size:11px;color:var(--text2);margin-top:.15rem"><i class="ti ti-map-pin"></i> ${com.destino_envio}</div>
         </div>
         <div style="text-align:right">
-          ${com.fecha_limite<hoy?
+          ${com.fecha_limite&&com.fecha_limite<hoy?
             `<div style="font-size:22px;font-weight:700;color:var(--danger);font-family:var(--fm)">${Math.abs(Math.round((new Date(com.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)))}d</div><div style="font-size:10px;color:var(--danger)">ATRASADO</div>`:
-            `<div style="font-size:22px;font-weight:700;color:var(--acc3);font-family:var(--fm)">${Math.round((new Date(com.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000))}</div><div style="font-size:10px;color:var(--text2)">días restantes</div>`}
+            com.fecha_limite?`<div style="font-size:22px;font-weight:700;color:var(--acc3);font-family:var(--fm)">${Math.round((new Date(com.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000))}</div><div style="font-size:10px;color:var(--text2)">días restantes</div>`:''}
         </div>
       </div>
+      ${com.fecha_disponible||com.fecha_en_ruta||com.fecha_entrega_real?`
+      <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.3rem;padding-top:.4rem;border-top:1px solid var(--border)">
+        ${com.fecha_disponible?`<span style="font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(16,185,129,.1);color:var(--acc3)"><i class="ti ti-circle-check"></i> Disponible: ${fmtDate(com.fecha_disponible)}</span>`:''}
+        ${com.fecha_en_ruta?`<span style="font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(239,159,39,.1);color:#ef9f27"><i class="ti ti-truck"></i> En ruta: ${fmtDate(com.fecha_en_ruta)}</span>`:''}
+        ${com.fecha_entrega_real?`<span style="font-size:10px;padding:2px 7px;border-radius:6px;background:rgba(127,119,221,.1);color:#7f77dd"><i class="ti ti-flag"></i> Entregado: ${fmtDate(com.fecha_entrega_real)}</span>`:''}
+      </div>`:''}
     </div>`:''}
 
     <!-- ESTADO Y ÁREA -->
@@ -2746,6 +2752,21 @@ async function cambiarEstadoEquipo(cod, nuevoEstado){
     await supa.patch('equipos',`codigo_interno=eq.${cod}`,{estado_equipo:nuevoEstado});
     const eq=S.equipos.find(e=>e.codigo_interno===cod);
     if(eq) eq.estado_equipo=nuevoEstado;
+    // Registrar fecha automáticamente en el compromiso activo
+    const hoy=today();
+    const com=S.compromisos.find(c=>c.equipo_cod===cod&&c.estado!=='Entregado');
+    if(com){
+      if(nuevoEstado==='Disponible'){
+        await supa.patch('compromisos',`id_compromiso=eq.${com.id_compromiso}`,{fecha_disponible:hoy});
+        com.fecha_disponible=hoy;
+      } else if(nuevoEstado==='En Ruta'){
+        await supa.patch('compromisos',`id_compromiso=eq.${com.id_compromiso}`,{fecha_en_ruta:hoy});
+        com.fecha_en_ruta=hoy;
+      } else if(nuevoEstado==='Entregado'){
+        await supa.patch('compromisos',`id_compromiso=eq.${com.id_compromiso}`,{fecha_entrega_real:hoy,estado:'Entregado'});
+        com.fecha_entrega_real=hoy; com.estado='Entregado';
+      }
+    }
     openEqDetail(cod);
   }catch(e){alert('Error: '+e.message);}
 }
