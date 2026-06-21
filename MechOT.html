@@ -2275,12 +2275,15 @@ function renderJefeDash(tc){
     // Sin fecha = En Proceso sin compromiso asignado
     const eqEnProceso=eqList.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso');
     const sinFecha=eqEnProceso.filter(e=>!codsConCom.has(e.codigo_interno)).length;
+    // Días promedio en taller
+    const conIngreso=eqEnProceso.filter(e=>e.fecha_ingreso);
+    const diasPromedio=conIngreso.length?Math.round(conIngreso.reduce((a,e)=>a+Math.round((new Date(hoy+'T12:00:00')-new Date(e.fecha_ingreso+'T12:00:00'))/(86400000)),0)/conIngreso.length):null;
     // Entregados esta semana = fecha_entrega_real dentro de la semana
     const entSemana=comList.filter(c=>c.estado==='Entregado'&&c.fecha_entrega_real>=lunStr&&c.fecha_entrega_real<=domStr).length;
     const comsSem=comList.filter(c=>c.estado!=='Entregado');
     const metaSem=comsSem.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length;
     const proxSem=comsSem.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr).length;
-    return {proceso,disp,ruta,atrasados,conFecha,sinFecha,entSemana,metaSem,proxSem};
+    return {proceso,disp,ruta,atrasados,conFecha,sinFecha,entSemana,metaSem,proxSem,diasPromedio};
   }
 
   const eqVis=visibleEquipos();
@@ -2486,6 +2489,55 @@ function renderJefeDash(tc){
       </div>
     </div>
 
+    <!-- EFICIENCIA DEL TALLER -->
+    ${kActual.diasPromedio!==null?`
+    <div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-chart-bar"></i> Eficiencia del taller</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px">
+      <div style="border:1.5px solid ${kActual.diasPromedio>45?'var(--danger)':kActual.diasPromedio>30?'var(--acc)':'var(--acc3)'};border-radius:10px;padding:10px 12px;text-align:center">
+        <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-clock"></i> Días prom. en taller</div>
+        <div style="font-size:28px;font-weight:500;color:${kActual.diasPromedio>45?'var(--danger)':kActual.diasPromedio>30?'var(--acc)':'var(--acc3)'};font-family:var(--fm)">${kActual.diasPromedio}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">equipos En Proceso</div>
+      </div>
+      <div style="border:1.5px solid var(--acc3);border-radius:10px;padding:10px 12px;text-align:center">
+        <div style="font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:.3px;margin-bottom:4px"><i class="ti ti-trending-up"></i> Req. mecánica OK</div>
+        <div style="font-size:28px;font-weight:500;color:var(--acc3);font-family:var(--fm)">${eqBase.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso'&&e.req_mecanica==='ok').length}</div>
+        <div style="font-size:10px;color:var(--text2);margin-top:2px">de ${kActual.proceso} en proceso</div>
+      </div>
+    </div>`:''}
+
+    <!-- CARGA DE TRABAJO -->
+    ${(()=>{
+      const otsSemTec=visibleOTs().filter(o=>o.fecha_programada>=lunStr&&o.fecha_programada<=domStr);
+      const porTec={};
+      otsSemTec.forEach(o=>{
+        if(!porTec[o.tecnico]) porTec[o.tecnico]={total:0,fin:0,hProg:0,hEjec:0};
+        porTec[o.tecnico].total++;
+        if(o.estado==='finalizada') porTec[o.tecnico].fin++;
+        porTec[o.tecnico].hProg+=parseFloat(o.horas_programadas)||0;
+        porTec[o.tecnico].hEjec+=parseFloat(o.horas_ejecutadas)||0;
+      });
+      const tecs=Object.entries(porTec).sort((a,b)=>b[1].total-a[1].total);
+      if(!tecs.length) return '';
+      return `<div style="font-size:10px;font-weight:500;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;padding:5px 10px;background:var(--bg3);border-radius:8px;margin-bottom:8px"><i class="ti ti-users"></i> Carga de trabajo esta semana</div>
+      <div class="card">
+        ${tecs.map(([tec,d])=>{
+          const pct=d.hProg?Math.min(100,Math.round(d.hEjec/d.hProg*100)):0;
+          const cumpl=d.total?Math.round(d.fin/d.total*100):0;
+          return `<div style="margin-bottom:.6rem;padding-bottom:.6rem;border-bottom:1px solid var(--border)">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.25rem">
+              <span style="font-size:12px;font-weight:500">${tec}</span>
+              <div style="display:flex;gap:.3rem">
+                <span style="font-size:10px;padding:1px 6px;border-radius:5px;background:var(--bg3);color:var(--text2)">${d.total} OT${d.total>1?'s':''}</span>
+                <span style="font-size:10px;padding:1px 6px;border-radius:5px;background:${cumpl===100?'rgba(16,185,129,.1)':'var(--bg3)'};color:${cumpl===100?'var(--acc3)':'var(--text2)'}">${cumpl}%</span>
+              </div>
+            </div>
+            <div style="font-size:10px;color:var(--text2);margin-bottom:.2rem">${d.hEjec}h reales / ${d.hProg}h prog.</div>
+            ${pbw(pct)}
+          </div>`;
+        }).join('')}
+      </div>`;
+    })()}
+
     <!-- OTs ESTA SEMANA -->
     ${(()=>{
       const otsSem=visibleOTs().filter(o=>o.fecha_programada>=lunStr&&o.fecha_programada<=domStr);
@@ -2620,13 +2672,17 @@ function openEqDetail(cod){
   document.getElementById('m-det-b').innerHTML=`
     <div style="margin-bottom:.75rem">
       <div style="font-weight:600;font-size:15px">${e.nombre}</div>
-      <div style="font-size:12px;color:var(--text2)">${e.marca} ${e.modelo}</div>
+      <div style="font-size:12px;color:var(--text2)">${e.marca} ${e.modelo} ${e.anio?'· '+e.anio:''}</div>
       <div style="display:flex;gap:.35rem;margin-top:.35rem;flex-wrap:wrap;align-items:center">
         ${eqEstadoBadge(est)}
         ${areaBadge(e.area)}
         <span style="font-size:9px;padding:1px 6px;border-radius:10px;background:rgba(139,92,246,.1);color:#c4b5fd;border:1px solid rgba(139,92,246,.25);font-family:var(--fm)">${e.sucursal}</span>
         <span style="font-size:11px;color:var(--text3)">${e.tipo}</span>
       </div>
+      ${e.fecha_ingreso?`<div style="margin-top:.35rem;font-size:11px;color:var(--text2)">
+        <i class="ti ti-calendar-plus" style="font-size:10px"></i> Ingresó: ${fmtDate(e.fecha_ingreso)}
+        <span style="margin-left:.5rem;padding:1px 7px;border-radius:10px;background:var(--bg3);font-family:var(--fm);font-size:10px;color:${(()=>{const dias=Math.round((new Date(hoy+'T12:00:00')-new Date(e.fecha_ingreso+'T12:00:00'))/(86400000));return dias>60?'var(--danger)':dias>30?'var(--acc)':'var(--acc3)';})()}">${Math.round((new Date(hoy+'T12:00:00')-new Date(e.fecha_ingreso+'T12:00:00'))/(86400000))} días en taller</span>
+      </div>`:''}
     </div>
 
     <!-- FECHA COMPROMETIDA DESTACADA -->
@@ -3118,11 +3174,14 @@ function renderAdminKPIs(tc){
     }).length;
     const eqEnProceso=eqList.filter(e=>(e.estado_equipo||'En Proceso')==='En Proceso');
     const sinFecha=eqEnProceso.filter(e=>!codsConCom.has(e.codigo_interno)).length;
+    // Días promedio en taller
+    const conIngreso=eqEnProceso.filter(e=>e.fecha_ingreso);
+    const diasPromedio=conIngreso.length?Math.round(conIngreso.reduce((a,e)=>a+Math.round((new Date(hoy+'T12:00:00')-new Date(e.fecha_ingreso+'T12:00:00'))/(86400000)),0)/conIngreso.length):null;
     const entSemana=comList.filter(c=>c.estado==='Entregado'&&c.fecha_entrega_real>=lunStr&&c.fecha_entrega_real<=domStr).length;
     const comsSem=comList.filter(c=>c.estado!=='Entregado');
     const metaSem=comsSem.filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=domStr).length;
     const proxSem=comsSem.filter(c=>c.fecha_limite>=nextLunStr&&c.fecha_limite<=nextDomStr).length;
-    return {proceso,disp,ruta,atrasados,conFecha,sinFecha,entSemana,metaSem,proxSem};
+    return {proceso,disp,ruta,atrasados,conFecha,sinFecha,entSemana,metaSem,proxSem,diasPromedio};
   }
 
   function tablaKPIAdmin(k){
