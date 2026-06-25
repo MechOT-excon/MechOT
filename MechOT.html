@@ -183,10 +183,13 @@ const supa = {
     const controller=new AbortController();
     const timeout=setTimeout(()=>controller.abort(),30000);
     try{
+      // Usar FormData para compatibilidad con iOS Safari
+      const formData=new FormData();
+      formData.append('',file,path.split('/').pop());
       const r=await fetch(`${SUPA_URL}/storage/v1/object/mechot-fotos/${path}`,{
         method:'POST',
-        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'image/jpeg','x-upsert':'true'},
-        body:file,
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'x-upsert':'true'},
+        body:formData,
         signal:controller.signal
       });
       clearTimeout(timeout);
