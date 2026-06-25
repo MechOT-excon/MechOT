@@ -190,10 +190,16 @@ const supa = {
         signal:controller.signal
       });
       clearTimeout(timeout);
-      if(!r.ok){const err=await r.text();throw new Error(err);}
+      if(!r.ok){
+        const err=await r.text();
+        console.error('Upload error status:',r.status,'body:',err);
+        alert(`Error subida (${r.status}): ${err}`);
+        throw new Error(err);
+      }
       return `${SUPA_URL}/storage/v1/object/public/mechot-fotos/${path}`;
     }catch(e){
       clearTimeout(timeout);
+      console.error('Upload catch:',e.message);
       throw e;
     }
   }
