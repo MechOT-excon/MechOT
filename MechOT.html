@@ -180,13 +180,22 @@ const supa = {
     return true;
   },
   async upload(path, file){
-    const r=await fetch(`${SUPA_URL}/storage/v1/object/mechot-fotos/${path}`,{
-      method:'POST',
-      headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':file.type,'x-upsert':'true'},
-      body:file
-    });
-    if(!r.ok) throw new Error(await r.text());
-    return `${SUPA_URL}/storage/v1/object/public/mechot-fotos/${path}`;
+    const controller=new AbortController();
+    const timeout=setTimeout(()=>controller.abort(),30000); // 30s timeout
+    try{
+      const r=await fetch(`${SUPA_URL}/storage/v1/object/mechot-fotos/${path}`,{
+        method:'POST',
+        headers:{'apikey':SUPA_KEY,'Authorization':'Bearer '+SUPA_KEY,'Content-Type':'image/jpeg','x-upsert':'true'},
+        body:file,
+        signal:controller.signal
+      });
+      clearTimeout(timeout);
+      if(!r.ok){const err=await r.text();throw new Error(err);}
+      return `${SUPA_URL}/storage/v1/object/public/mechot-fotos/${path}`;
+    }catch(e){
+      clearTimeout(timeout);
+      throw e;
+    }
   }
 };
 </script>
@@ -1986,7 +1995,7 @@ async function uploadConReintento(path, file, intentos=3){
 }
 
 // Comprimir imagen antes de subir (máx 1200px, calidad 0.75)
-async function comprimirImagen(file, maxPx=1200, calidad=0.75){
+async function comprimirImagen(file, maxPx=900, calidad=0.65){
   return new Promise(res=>{
     const img=new Image();
     const url=URL.createObjectURL(file);
