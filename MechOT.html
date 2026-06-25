@@ -181,7 +181,7 @@ const supa = {
   },
   async upload(path, file){
     const controller=new AbortController();
-    const timeout=setTimeout(()=>controller.abort(),30000); // 30s timeout
+    const timeout=setTimeout(()=>controller.abort(),30000);
     try{
       const r=await fetch(`${SUPA_URL}/storage/v1/object/mechot-fotos/${path}`,{
         method:'POST',
@@ -198,6 +198,101 @@ const supa = {
     }
   }
 };
+
+// ── COLA DE SUBIDA OFFLINE ───────────────────────────────────
+const uploadQueue={
+  _queue:[],
+  _processing:false,
+
+  // Agregar foto a la cola y guardar en IndexedDB
+  async add(path, file, onSuccess, onFail){
+    return new Promise(async(resolve)=>{
+      // Convertir file a ArrayBuffer para guardarlo
+      const buf=await file.arrayBuffer();
+      const item={path, buf, type:file.type, ts:Date.now(), id:Math.random().toString(36).slice(2)};
+      this._queue.push({...item, onSuccess, onFail, resolve});
+      await this._saveToIDB(item);
+      this._updateBadge();
+      resolve(null); // retorna null = pendiente
+    });
+  },
+
+  // Intentar subir todo lo que está en cola
+  async processAll(){
+    if(this._processing||!navigator.onLine) return;
+    this._processing=true;
+    const items=[...this._queue];
+    for(const item of items){
+      try{
+        const blob=new Blob([item.buf],{type:'image/jpeg'});
+        const url=await supa.upload(item.path, blob);
+        // Éxito — remover de cola
+        this._queue=this._queue.filter(i=>i.id!==item.id);
+        await this._removeFromIDB(item.id);
+        if(item.onSuccess) item.onSuccess(url);
+        addAlert('info','Foto subida','Se subió una foto que estaba pendiente: '+item.path.split('/').pop());
+      }catch(e){
+        // Sigue en cola para el próximo intento
+      }
+    }
+    this._processing=false;
+    this._updateBadge();
+  },
+
+  // Guardar en IndexedDB para persistencia
+  async _saveToIDB(item){
+    try{
+      const db=await this._openDB();
+      const tx=db.transaction('queue','readwrite');
+      tx.objectStore('queue').put({id:item.id,path:item.path,buf:item.buf,type:item.type,ts:item.ts});
+    }catch(e){}
+  },
+  async _removeFromIDB(id){
+    try{
+      const db=await this._openDB();
+      const tx=db.transaction('queue','readwrite');
+      tx.objectStore('queue').delete(id);
+    }catch(e){}
+  },
+  async _openDB(){
+    return new Promise((res,rej)=>{
+      const r=indexedDB.open('mechot_queue',1);
+      r.onupgradeneeded=e=>e.target.result.createObjectStore('queue',{keyPath:'id'});
+      r.onsuccess=e=>res(e.target.result);
+      r.onerror=e=>rej(e);
+    });
+  },
+  // Cargar cola desde IndexedDB al iniciar
+  async loadFromIDB(){
+    try{
+      const db=await this._openDB();
+      const tx=db.transaction('queue','readonly');
+      const items=await new Promise((res,rej)=>{
+        const r=tx.objectStore('queue').getAll();
+        r.onsuccess=e=>res(e.target.result);
+        r.onerror=rej;
+      });
+      this._queue=items.map(i=>({...i,onSuccess:null,onFail:null}));
+      this._updateBadge();
+      if(items.length>0) addAlert('warn','Fotos pendientes',`Hay ${items.length} foto(s) sin subir. Se subirán automáticamente.`);
+    }catch(e){}
+  },
+  _updateBadge(){
+    const n=this._queue.length;
+    const badge=document.getElementById('upload-queue-badge');
+    const count=document.getElementById('upload-queue-count');
+    if(badge) badge.style.display=n>0?'flex':'none';
+    if(count) count.textContent=n>0?`${n} foto${n>1?'s':''} pendiente${n>1?'s':''}`:'';
+  }
+};
+
+// Escuchar cuando vuelve la conexión
+window.addEventListener('online',()=>{
+  addAlert('info','Conexión restaurada','Subiendo fotos pendientes...');
+  uploadQueue.processAll();
+});
+// Intentar cada 30 segundos si hay pendientes
+setInterval(()=>{if(navigator.onLine&&uploadQueue._queue.length>0) uploadQueue.processAll();},30000);
 </script>
 
 <!-- LOGIN -->
@@ -238,6 +333,10 @@ const supa = {
     <div class="tbr">
       <span id="tb-sitio" style="font-size:10px;padding:2px 7px;border-radius:4px;font-family:var(--fm);display:none"></span>
       <button class="ab" onclick="openAlerts()" id="ab"><i class="ti ti-bell"></i><span class="adot hidden" id="adot"></span></button>
+      <div id="upload-queue-badge" style="display:none;position:relative;background:rgba(239,159,39,.15);border:1px solid rgba(239,159,39,.4);border-radius:99px;padding:2px 8px;font-size:10px;color:#ef9f27;cursor:pointer;align-items:center;gap:3px" onclick="uploadQueue.processAll()" title="Fotos pendientes de subir — toca para reintentar">
+        <i class="ti ti-cloud-upload" style="font-size:11px"></i>
+        <span id="upload-queue-count"></span>
+      </div>
       <button class="bl" onclick="logout()"><i class="ti ti-logout"></i></button>
     </div>
   </div>
@@ -414,6 +513,10 @@ function showApp(){
     sb.style.cssText='display:inline-block;font-size:10px;padding:2px 7px;border-radius:4px;font-family:var(--fm);background:rgba(139,92,246,.12);color:#c4b5fd;border:1px solid rgba(139,92,246,.3)';
   }else{sb.style.display='none';}
   S.tab=0; renderRole();
+  // Cargar cola offline pendiente
+  uploadQueue.loadFromIDB();
+  // Intentar subir pendientes si hay conexión
+  if(navigator.onLine) setTimeout(()=>uploadQueue.processAll(),2000);
 }
 function logout(){
   S.role=null; S.userName=''; S.userEmail=''; S.userSitio='todos';
@@ -1983,13 +2086,22 @@ async function saveEval(){
 }
 
 
-// Upload con hasta 3 reintentos automáticos
+// Upload con reintentos — si falla 3 veces agrega a cola offline
 async function uploadConReintento(path, file, intentos=3){
   for(let i=0;i<intentos;i++){
     try{ return await supa.upload(path,file); }
     catch(e){
-      if(i===intentos-1) throw e;
-      await new Promise(r=>setTimeout(r,1500*(i+1))); // espera 1.5s, 3s
+      if(i===intentos-1){
+        // Agregar a cola offline
+        addAlert('warn','Sin conexión','Foto guardada localmente. Se subirá cuando haya señal.');
+        return new Promise(resolve=>{
+          uploadQueue.add(path, file,
+            (url)=>{ resolve(url); }, // éxito diferido
+            ()=>{}
+          );
+        });
+      }
+      await new Promise(r=>setTimeout(r,1500*(i+1)));
     }
   }
 }
