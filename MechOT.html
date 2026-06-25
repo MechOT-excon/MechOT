@@ -2104,6 +2104,13 @@ function sanitizePath(str){
 }
 
 // Upload con reintentos — si falla 3 veces agrega a cola offline
+function sanitizePath(str){
+  return str
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'') // quitar tildes
+    .replace(/[^a-zA-Z0-9_\-]/g,'_') // solo alfanumérico, guion y underscore
+    .replace(/_+/g,'_') // no doble underscore
+    .substring(0,40); // máx 40 chars
+}
 async function uploadConReintento(path, file, intentos=3){
   for(let i=0;i<intentos;i++){
     try{ return await supa.upload(path,file); }
