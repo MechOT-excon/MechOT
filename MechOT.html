@@ -694,73 +694,128 @@ function getWeekRange(){
 }
 
 function renderSupSemana(tc){
-  const {lun,lunStr,domStr}=getWeekRange();
-  const ots=visibleOTs().filter(o=>o.fecha_programada>=lunStr&&o.fecha_programada<=domStr);
+  const {lun,lunStr}=getWeekRange();
   const hoyStr=today();
+  // 3 semanas desde el lunes actual = 21 días
+  const fin3sem=new Date(lun); fin3sem.setDate(lun.getDate()+20);
+  const fin3semStr=fin3sem.toISOString().split('T')[0];
+  // OTs de las 3 semanas
+  const otsRango=visibleOTs().filter(o=>o.fecha_programada>=lunStr&&o.fecha_programada<=fin3semStr);
+  // OTs activas pendientes de semanas anteriores
+  const otsActivas=visibleOTs().filter(o=>o.estado!=='finalizada'&&o.fecha_programada<lunStr);
+  // Construir 21 días
   const dias=[];
-  for(let i=0;i<7;i++){
+  for(let i=0;i<21;i++){
     const d=new Date(lun); d.setDate(lun.getDate()+i);
     const ds=d.toISOString().split('T')[0];
-    dias.push({ds,dOTs:ots.filter(o=>o.fecha_programada===ds),
-      nomDia:['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d.getDay()],dNum:d.getDate()});
+    dias.push({ds,dOTs:otsRango.filter(o=>o.fecha_programada===ds),
+      nomDia:['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'][d.getDay()],
+      dNum:d.getDate(),
+      semana:Math.floor(i/7)});
   }
-  const tot=ots.length; const fin=ots.filter(o=>o.estado==='finalizada').length;
-  const cumplSem=tot?Math.round(fin/tot*100):0;
+  const semanas=[0,1,2];
+  const nomSem=['Esta semana','Próxima semana','En 2 semanas'];
+  const tot=otsRango.length; const fin=otsRango.filter(o=>o.estado==='finalizada').length;
+  const cumpl=tot?Math.round(fin/tot*100):0;
   tc.innerHTML=`
-    <div style="display:flex;gap:4px;margin-bottom:.75rem;overflow-x:auto">
-      ${dias.map(d=>{
-        const isHoy=d.ds===hoyStr;
-        const hasPaus=d.dOTs.some(o=>o.estado==='pausada');
-        const allFin=d.dOTs.length>0&&d.dOTs.every(o=>o.estado==='finalizada');
-        return `<div style="flex:1;min-width:38px;text-align:center;padding:.4rem .2rem;border-radius:8px;cursor:pointer;
-          background:${isHoy?'var(--acc2)':'var(--bg2)'};
-          border:1px solid ${isHoy?'var(--acc2)':hasPaus?'rgba(249,115,22,.4)':allFin?'rgba(16,185,129,.3)':d.dOTs.length?'var(--border2)':'var(--border)'}"
-          onclick="document.getElementById('sd-${d.ds}')?.scrollIntoView({behavior:'smooth'})">
-          <div style="font-size:9px;color:${isHoy?'rgba(255,255,255,.7)':'var(--text3)'}">${d.nomDia}</div>
-          <div style="font-size:13px;font-weight:600;color:${isHoy?'#fff':d.dOTs.length?'var(--text)':'var(--text3)'}">${d.dNum}</div>
-          ${d.dOTs.length?`<div style="font-size:8px;color:${isHoy?'rgba(255,255,255,.8)':allFin?'var(--acc3)':hasPaus?'var(--warn)':'var(--acc2)'}">${d.dOTs.length}</div>`:`<div style="font-size:8px;color:var(--text3)">—</div>`}
-        </div>`;
-      }).join('')}
-    </div>
     <div class="sg" style="margin-bottom:.65rem">
-      <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">OTs Semana</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc3)">${cumplSem}%</div><div class="sl">Cumplimiento</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc)">${tot}</div><div class="sl">OTs 3 semanas</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc3)">${cumpl}%</div><div class="sl">Cumplimiento</div></div>
     </div>
-    ${dias.map(d=>d.dOTs.length?`<div id="sd-${d.ds}">
-      <div class="shd" style="color:${d.ds===hoyStr?'var(--acc2)':'var(--text)'}">
-        <i class="ti ti-calendar-event"></i>${d.nomDia} ${d.dNum}${d.ds===hoyStr?' · Hoy':''}
-        <span style="margin-left:auto;font-size:9px;color:var(--text3)">${d.dOTs.filter(o=>o.estado==='finalizada').length}/${d.dOTs.length}</span>
+    ${otsActivas.length?`
+    <div class="shd" style="color:var(--danger)"><i class="ti ti-clock-off"></i> Pendientes anteriores (${otsActivas.length})</div>
+    ${otsActivas.map(o=>otCard(o,'openSupOT')).join('')}`:''}
+    ${semanas.map(s=>{
+      const diasSem=dias.filter(d=>d.semana===s);
+      const otsEnSem=diasSem.flatMap(d=>d.dOTs);
+      return `
+      <div class="shd" style="margin-top:.5rem"><i class="ti ti-calendar-week"></i> ${nomSem[s]} <span style="margin-left:auto;font-size:10px;color:var(--text3)">${otsEnSem.length} OT${otsEnSem.length!==1?'s':''}</span></div>
+      <!-- Mini calendario semana -->
+      <div style="display:flex;gap:4px;margin-bottom:.5rem">
+        ${diasSem.map(d=>{
+          const isHoy=d.ds===hoyStr;
+          const hasPaus=d.dOTs.some(o=>o.estado==='pausada');
+          const allFin=d.dOTs.length>0&&d.dOTs.every(o=>o.estado==='finalizada');
+          return `<div style="flex:1;min-width:38px;text-align:center;padding:.35rem .2rem;border-radius:8px;cursor:pointer;
+            background:${isHoy?'var(--acc2)':'var(--bg2)'};
+            border:1px solid ${isHoy?'var(--acc2)':hasPaus?'rgba(249,115,22,.4)':allFin?'rgba(16,185,129,.3)':d.dOTs.length?'var(--border2)':'var(--border)'}"
+            onclick="document.getElementById('sd-${d.ds}')?.scrollIntoView({behavior:'smooth'})">
+            <div style="font-size:9px;color:${isHoy?'rgba(255,255,255,.7)':'var(--text3)'}">${d.nomDia}</div>
+            <div style="font-size:13px;font-weight:600;color:${isHoy?'#fff':d.dOTs.length?'var(--text)':'var(--text3)'}">${d.dNum}</div>
+            ${d.dOTs.length?`<div style="font-size:8px;color:${isHoy?'rgba(255,255,255,.8)':allFin?'var(--acc3)':hasPaus?'var(--warn)':'var(--acc2)'}">${d.dOTs.length}</div>`:`<div style="font-size:8px;color:var(--text3)">—</div>`}
+          </div>`;
+        }).join('')}
       </div>
-      ${d.dOTs.map(o=>otCard(o,'openSupOT')).join('')}</div>`:'').join('')
-    ||`<div class="es"><i class="ti ti-calendar-off"></i>Sin OTs esta semana</div>`}`;
+      <!-- OTs de cada día -->
+      ${diasSem.map(d=>d.dOTs.length?`<div id="sd-${d.ds}">
+        <div class="shd" style="color:${d.ds===hoyStr?'var(--acc2)':'var(--text)'};font-size:11px">
+          <i class="ti ti-calendar-event"></i> ${d.nomDia} ${d.dNum}${d.ds===hoyStr?' · Hoy':''}
+          <span style="margin-left:auto;font-size:9px;color:var(--text3)">${d.dOTs.filter(o=>o.estado==='finalizada').length}/${d.dOTs.length}</span>
+        </div>
+        ${d.dOTs.map(o=>otCard(o,'openSupOT')).join('')}
+      </div>`:'').join('')}`;
+    }).join('')}
+    ${!tot&&!otsActivas.length?`<div class="es"><i class="ti ti-calendar-off"></i>Sin OTs en las próximas 3 semanas</div>`:''}`;
 }
 
 function renderSupCompromisos(tc){
   const hoy=today();
-  const coms=visibleCompromisos().sort((a,b)=>a.fecha_limite.localeCompare(b.fecha_limite));
-  const vencidos=coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite<hoy);
+  const {lun,lunStr}=getWeekRange();
+  // Calcular fin de 3 semanas
+  const fin3sem=new Date(lun); fin3sem.setDate(lun.getDate()+20);
+  const fin3semStr=fin3sem.toISOString().split('T')[0];
+  // Semanas
+  const sem2lun=new Date(lun); sem2lun.setDate(lun.getDate()+7);
+  const sem2lunStr=sem2lun.toISOString().split('T')[0];
+  const sem2dom=new Date(lun); sem2dom.setDate(lun.getDate()+13);
+  const sem2domStr=sem2dom.toISOString().split('T')[0];
+  const sem3lun=new Date(lun); sem3lun.setDate(lun.getDate()+14);
+  const sem3lunStr=sem3lun.toISOString().split('T')[0];
+
+  const coms=visibleCompromisos().sort((a,b)=>{
+    if(!a.fecha_limite) return 1; if(!b.fecha_limite) return -1;
+    return a.fecha_limite.localeCompare(b.fecha_limite);
+  });
+  const vencidos=coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite&&c.fecha_limite<hoy);
   const hoyList=coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite===hoy);
-  const proximos=coms.filter(c=>{
-    if(c.estado==='Entregado'||c.fecha_limite<=hoy) return false;
-    return Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000))<=7;
-  });
-  const resto=coms.filter(c=>{
-    if(c.estado==='Entregado'||c.fecha_limite<=hoy) return false;
-    return Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000))>7;
-  });
+  const sem1=coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite&&c.fecha_limite>hoy&&c.fecha_limite<=new Date(lun).toISOString().split('T')[0].replace(/-\d+$/,'')||false||c.fecha_limite>=lunStr&&c.fecha_limite<=fin3semStr.replace(fin3semStr.split('-')[2],String(parseInt(lun.getDate())+6).padStart(2,'0'))).filter(c=>c.fecha_limite>=lunStr&&c.fecha_limite<=sem2lunStr.replace(sem2lunStr.split('-')[2],String(parseInt(sem2lunStr.split('-')[2])-1).padStart(2,'0')));
+
+  // Simplificado — agrupar por semana directamente
+  const getWeekNum=(dateStr)=>{
+    if(!dateStr) return 99;
+    if(dateStr<lunStr) return -1; // vencido
+    if(dateStr===hoy) return 0; // hoy
+    if(dateStr>=lunStr&&dateStr<sem2lunStr) return 1; // semana 1
+    if(dateStr>=sem2lunStr&&dateStr<sem3lunStr) return 2; // semana 2
+    if(dateStr>=sem3lunStr&&dateStr<=fin3semStr) return 3; // semana 3
+    return 4; // más adelante
+  };
+
+  const semGroups={
+    '-1': coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite&&c.fecha_limite<hoy),
+    '0':  coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite===hoy),
+    '1':  coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite&&c.fecha_limite>=lunStr&&c.fecha_limite<sem2lunStr&&c.fecha_limite!==hoy),
+    '2':  coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite&&c.fecha_limite>=sem2lunStr&&c.fecha_limite<sem3lunStr),
+    '3':  coms.filter(c=>c.estado!=='Entregado'&&c.fecha_limite&&c.fecha_limite>=sem3lunStr&&c.fecha_limite<=fin3semStr),
+    '4':  coms.filter(c=>c.estado!=='Entregado'&&(!c.fecha_limite||c.fecha_limite>fin3semStr)),
+  };
   const entregados=coms.filter(c=>c.estado==='Entregado');
+  const totalPend=Object.values(semGroups).flat().length;
+
   tc.innerHTML=`
     <div class="sg" style="margin-bottom:.65rem">
-      <div class="sc"><div class="sv" style="color:var(--danger)">${vencidos.length}</div><div class="sl">Vencidos</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc)">${hoyList.length}</div><div class="sl">Vencen hoy</div></div>
-      <div class="sc"><div class="sv" style="color:var(--acc2)">${proximos.length}</div><div class="sl">Esta semana</div></div>
+      <div class="sc"><div class="sv" style="color:var(--danger)">${semGroups['-1'].length+semGroups['0'].length}</div><div class="sl">Vencidos/Hoy</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc2)">${semGroups['1'].length}</div><div class="sl">Esta semana</div></div>
+      <div class="sc"><div class="sv" style="color:var(--acc)">${semGroups['2'].length}</div><div class="sl">Próx. semana</div></div>
       <div class="sc"><div class="sv" style="color:var(--acc3)">${entregados.length}</div><div class="sl">Entregados</div></div>
     </div>
-    ${vencidos.length?`<div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Vencidos</div>${vencidos.map(c=>comCard(c)).join('')}`:''}
-    ${hoyList.length?`<div class="shd"><i class="ti ti-clock" style="color:var(--acc)"></i> Vencen hoy</div>${hoyList.map(c=>comCard(c)).join('')}`:''}
-    ${proximos.length?`<div class="shd"><i class="ti ti-calendar-week" style="color:var(--acc2)"></i> Próximos 7 días</div>${proximos.map(c=>comCard(c)).join('')}`:''}
-    ${resto.length?`<div class="shd"><i class="ti ti-calendar"></i> Más adelante</div>${resto.map(c=>comCard(c)).join('')}`:''}
-    ${entregados.length?`<div class="shd"><i class="ti ti-circle-check" style="color:var(--acc3)"></i> Entregados</div>${entregados.map(c=>comCard(c)).join('')}`:''}
+    ${semGroups['-1'].length?`<div class="shd"><i class="ti ti-alert-triangle" style="color:var(--danger)"></i> Vencidos (${semGroups['-1'].length})</div>${semGroups['-1'].map(c=>comCard(c)).join('')}`:''}
+    ${semGroups['0'].length?`<div class="shd"><i class="ti ti-clock" style="color:var(--danger)"></i> Vencen hoy (${semGroups['0'].length})</div>${semGroups['0'].map(c=>comCard(c)).join('')}`:''}
+    ${semGroups['1'].length?`<div class="shd"><i class="ti ti-calendar-week" style="color:var(--acc2)"></i> Esta semana (${semGroups['1'].length})</div>${semGroups['1'].map(c=>comCard(c)).join('')}`:''}
+    ${semGroups['2'].length?`<div class="shd"><i class="ti ti-calendar-week" style="color:var(--acc)"></i> Próxima semana (${semGroups['2'].length})</div>${semGroups['2'].map(c=>comCard(c)).join('')}`:''}
+    ${semGroups['3'].length?`<div class="shd"><i class="ti ti-calendar" style="color:var(--text2)"></i> En 2 semanas (${semGroups['3'].length})</div>${semGroups['3'].map(c=>comCard(c)).join('')}`:''}
+    ${semGroups['4'].length?`<div class="shd"><i class="ti ti-calendar" style="color:var(--text3)"></i> Más adelante / Sin fecha (${semGroups['4'].length})</div>${semGroups['4'].map(c=>comCard(c)).join('')}`:''}
+    ${entregados.length?`<div class="shd"><i class="ti ti-circle-check" style="color:var(--acc3)"></i> Entregados (${entregados.length})</div>${entregados.map(c=>comCard(c)).join('')}`:''}
     ${!coms.length?`<div class="es"><i class="ti ti-flag-off"></i>Sin compromisos</div>`:''}`;
 }
 
@@ -844,7 +899,7 @@ async function openSupOT(id_ot){
             style="width:100%;background:var(--bg2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;font-family:var(--fm);margin-bottom:.5rem;box-sizing:border-box">
           <!-- Foto -->
           <div class="ncph ${t.foto_tarea_url?'up':''}" onclick="document.getElementById('ft-${id_ot}-${i}').click()" style="margin-bottom:.5rem">
-            <input type="file" id="ft-${id_ot}-${i}" accept="image/*" capture="environment"
+            <input type="file" id="ft-${id_ot}-${i}" accept="image/*" 
               onchange="handleFotoTareaOT('${id_ot}',${i},this)">
             ${t.foto_tarea_url?
               `<i class="ti ti-photo-check"></i> Foto ✓ <a href="${t.foto_tarea_url}" target="_blank" style="font-size:10px;margin-left:.3rem">ver</a>`:
@@ -865,7 +920,7 @@ async function openSupOT(id_ot){
         <span style="color:var(--danger);font-size:10px;margin-left:.3rem">*Requerida para finalizar</span>
       </div>
       <div class="pu ${o.foto_cierre_url?'ok':''}" onclick="document.getElementById('fi-cierre').click()" id="pu-cierre">
-        <input type="file" id="fi-cierre" accept="image/*" capture="environment" onchange="handleFotoCierre('${id_ot}',this)">
+        <input type="file" id="fi-cierre" accept="image/*"  onchange="handleFotoCierre('${id_ot}',this)">
         <i class="ti ti-${o.foto_cierre_url?'photo-check':'camera'}"></i>
         <div class="pu-txt">${o.foto_cierre_url?'Foto adjunta ✓ — toca para cambiar':'Toca para capturar foto de cierre'}</div>
       </div>
@@ -943,7 +998,7 @@ function handleFotoTareaOT(id_ot, idx, inp){
       const url=await uploadConReintento(path,comp);
       _fotosTareasURL[String(idx)]=url;
       if(btn){
-        btn.innerHTML=`<input type="file" id="ft-${id_ot}-${idx}" accept="image/*" capture="environment"
+        btn.innerHTML=`<input type="file" id="ft-${id_ot}-${idx}" accept="image/*" 
           onchange="handleFotoTareaOT('${id_ot}',${idx},this)" style="display:none">
           <i class="ti ti-photo-check"></i> Foto ✓
           <a href="${url}" target="_blank" style="font-size:10px;margin-left:.3rem">ver</a>`;
@@ -1000,7 +1055,7 @@ async function handleFotoCierre(id_ot,inp){
     o.foto_cierre_url=url;
     await supa.patch('ots',`id_ot=eq.${id_ot}`,{foto_cierre_url:url});
     document.getElementById('pu-cierre').classList.add('ok');
-    document.getElementById('pu-cierre').innerHTML=`<input type="file" id="fi-cierre" accept="image/*" capture="environment" onchange="handleFotoCierre('${id_ot}',this)"><i class="ti ti-photo-check" style="font-size:22px;color:var(--acc3);display:block;margin-bottom:.3rem"></i><div class="pu-txt">Foto adjunta ✓</div>`;
+    document.getElementById('pu-cierre').innerHTML=`<input type="file" id="fi-cierre" accept="image/*"  onchange="handleFotoCierre('${id_ot}',this)"><i class="ti ti-photo-check" style="font-size:22px;color:var(--acc3);display:block;margin-bottom:.3rem"></i><div class="pu-txt">Foto adjunta ✓</div>`;
     document.querySelector(`button[onclick="finOT('${id_ot}')"]`)?.removeAttribute('disabled');
   }catch(e){
     addAlert('crit',`Foto de cierre falló — OT ${id_ot}`,'No se pudo subir la foto. Verifica tu conexión e intenta de nuevo.');
@@ -1356,7 +1411,7 @@ function iniciarChecklistEstandar(){
       </select></div>
     <div class="shd"><i class="ti ti-camera"></i> Foto Placa de Serie (obligatoria)</div>
     <div class="pu" id="pu-serie" onclick="document.getElementById('fi-serie').click()">
-      <input type="file" id="fi-serie" accept="image/*" capture="environment" onchange="handleFotoCS('serie',this)">
+      <input type="file" id="fi-serie" accept="image/*"  onchange="handleFotoCS('serie',this)">
       <i class="ti ti-id" id="icon-serie"></i><div class="pu-txt" id="txt-serie">Toca para fotografiar la placa de serie</div></div>
     <div class="shd"><i class="ti ti-file-text"></i> Documentación</div>
     ${['Revisión Técnica','Emisión de Gases','Seguro Obligatorio','Permiso de Circulación'].map((doc,i)=>`
@@ -1370,7 +1425,7 @@ function iniciarChecklistEstandar(){
           <input class="fi" id="doc-fecha-${i}" type="date" placeholder="Vencimiento" style="flex:1;font-size:11px">
         </div>
         <div class="pu" id="pu-doc-${i}" onclick="document.getElementById('fi-doc-${i}').click()" style="padding:.4rem">
-          <input type="file" id="fi-doc-${i}" accept="image/*" capture="environment" onchange="handleFotoDoc(${i},this)">
+          <input type="file" id="fi-doc-${i}" accept="image/*"  onchange="handleFotoDoc(${i},this)">
           <div style="font-size:10px;text-align:center;color:var(--text2)" id="txt-doc-${i}"><i class="ti ti-camera"></i> Foto del documento</div>
         </div>
       </div>`).join('')}
@@ -1452,7 +1507,7 @@ function renderChecklistForm(){
     <div class="shd"><i class="ti ti-camera" style="color:var(--danger)"></i> Fotos del Equipo (obligatorias)</div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:.4rem;margin-bottom:.65rem">
       ${fotosLados.map(f=>`<div class="pu ${fotos4[f.key]?'ok':''}" onclick="document.getElementById('fi-4-${f.key}').click()" style="padding:.5rem">
-        <input type="file" id="fi-4-${f.key}" accept="image/*" capture="environment" onchange="handleFoto4('${f.key}',this)">
+        <input type="file" id="fi-4-${f.key}" accept="image/*"  onchange="handleFoto4('${f.key}',this)">
         <i class="ti ${fotos4[f.key]?'ti-photo-check':'ti-camera'}" style="font-size:18px;display:block;text-align:center;color:${fotos4[f.key]?'var(--acc3)':'var(--text3)'}"></i>
         <div style="font-size:10px;text-align:center;color:${fotos4[f.key]?'var(--acc3)':'var(--text2)'};margin-top:.2rem">${f.label}${fotos4[f.key]?' ✓':''}</div>
       </div>`).join('')}
@@ -1477,7 +1532,7 @@ function renderChecklistForm(){
           <input class="fi" placeholder="Observación..." id="obs-${i}" value="${item.obs||''}"
             oninput="S.evalState.items[${i}].obs=this.value" style="font-size:12px;margin-bottom:.25rem">
           <div class="ncph ${item.foto?'up':''}" onclick="document.getElementById('ef-${i}').click()">
-            <input type="file" id="ef-${i}" accept="image/*" capture="environment" onchange="handleEF(${i},this)">
+            <input type="file" id="ef-${i}" accept="image/*"  onchange="handleEF(${i},this)">
             ${item.foto?'<i class="ti ti-photo-check"></i> Foto ✓':'<i class="ti ti-camera"></i> Foto requerida'}
           </div></div>`:''}
       </div>`;
@@ -1663,7 +1718,7 @@ function renderFormNeumaticos(){
           </div>
         </div>
         <div class="pu ${n.foto?'ok':''}" onclick="document.getElementById('fi-neum-${i}').click()" style="padding:.45rem">
-          <input type="file" id="fi-neum-${i}" accept="image/*" capture="environment" onchange="handleFotoNeum(${i},this)">
+          <input type="file" id="fi-neum-${i}" accept="image/*"  onchange="handleFotoNeum(${i},this)">
           <div style="text-align:center;font-size:11px;color:${n.foto?'var(--acc3)':'var(--text2)'}">
             <i class="ti ti-${n.foto?'photo-check':'camera'}"></i> ${n.foto?'Foto ✓':'Foto obligatoria'}</div>
         </div>
@@ -1831,7 +1886,7 @@ function renderEvalForm(){
           <input class="fi" placeholder="Observación requerida..." id="obs-${i}" value="${item.obs||''}"
             oninput="S.evalState.items[${i}].obs=this.value" style="font-size:12px;margin-bottom:.25rem">
           <div class="ncph ${item.foto?'up':''}" onclick="document.getElementById('ef-${i}').click()">
-            <input type="file" id="ef-${i}" accept="image/*" capture="environment" onchange="handleEF(${i},this)">
+            <input type="file" id="ef-${i}" accept="image/*"  onchange="handleEF(${i},this)">
             ${item.foto?'<i class="ti ti-photo-check"></i> Foto ✓':'<i class="ti ti-camera"></i> Foto requerida'}
           </div></div>`:''}
       </div>`;
@@ -2180,26 +2235,27 @@ async function verInspeccion(id){
 // ===================== COMPROMISOS =====================
 function comCard(c){
   const eq=getEq(c.equipo_cod);
+  if(!eq) return '';
   const hoy=today();
-  const diff=Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000));
-  const vencido=c.estado!=='Entregado'&&diff<0;
+  const diff=c.fecha_limite?Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000)):null;
+  const vencido=c.estado!=='Entregado'&&diff!==null&&diff<0;
   const venceHoy=c.estado!=='Entregado'&&diff===0;
   const cumplido=c.estado==='Entregado';
   const borderCol=cumplido?'rgba(16,185,129,.3)':vencido?'rgba(239,68,68,.4)':venceHoy?'rgba(245,158,11,.5)':'var(--border)';
-  const statusTxt=cumplido?'✓ Entregado':vencido?`⚠ ${Math.abs(diff)}d atrasado`:venceHoy?'⚠ Vence HOY':`Faltan ${diff}d`;
-  const statusCol=cumplido?'var(--acc3)':vencido?'var(--danger)':venceHoy?'var(--acc)':'var(--text2)';
+  const statusTxt=cumplido?'✓ Entregado':diff===null?'Sin fecha':vencido?`⚠ ${Math.abs(diff)}d atrasado`:venceHoy?'⚠ Vence HOY':`Faltan ${diff}d`;
+  const statusCol=cumplido?'var(--acc3)':diff===null?'#ef9f27':vencido?'var(--danger)':venceHoy?'var(--acc)':'var(--text2)';
   return `<div class="comcard" style="border-color:${borderCol}">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:.35rem">
-      <div><div class="ct" style="font-size:13px">${eq.nombre}</div><div style="font-size:10px;color:var(--text3)">${eq.codigo_interno}</div></div>
-      <div style="text-align:right"><div style="font-size:11px;font-weight:600;color:${statusCol}">${statusTxt}</div><div style="font-size:10px;color:var(--text2);font-family:var(--fm)">${fmtDate(c.fecha_limite)}</div></div>
+      <div><div class="ct" style="font-size:13px">${eq.nombre}</div><div style="font-size:10px;color:var(--text3)">${eq.codigo_interno} · ${eq.sucursal}</div></div>
+      <div style="text-align:right"><div style="font-size:11px;font-weight:600;color:${statusCol}">${statusTxt}</div><div style="font-size:10px;color:var(--text2);font-family:var(--fm)">${c.fecha_limite?fmtDate(c.fecha_limite):'—'}</div></div>
     </div>
     <div style="background:var(--bg3);border-radius:6px;padding:.4rem .6rem;margin-bottom:.35rem">
-      <div style="font-size:10px;color:var(--text2);margin-bottom:.15rem">Fecha límite entrega al taller</div>
-      <div style="font-size:12px"><i class="ti ti-flag" style="font-size:11px;color:var(--acc)"></i> ${c.objetivo}</div>
+      <div style="font-size:10px;color:var(--text2);margin-bottom:.15rem">Destino</div>
       <div style="font-size:11px;color:var(--text2);margin-top:.15rem"><i class="ti ti-map-pin" style="font-size:10px"></i> ${c.destino_envio}</div>
+      ${c.fecha_disponible?`<div style="font-size:10px;color:var(--acc3);margin-top:.15rem"><i class="ti ti-circle-check" style="font-size:10px"></i> Disponible: ${fmtDate(c.fecha_disponible)}</div>`:''}
     </div>
     ${!cumplido?`<button class="btn bs bsm" onclick="markEntregado('${c.id_compromiso}')"><i class="ti ti-check"></i> Marcar entregado</button>`:
-    `<div style="font-size:11px;color:var(--acc3)"><i class="ti ti-circle-check"></i> Entregado</div>`}
+    `<div style="font-size:11px;color:var(--acc3)"><i class="ti ti-circle-check"></i> Entregado ${c.fecha_entrega_real?fmtDate(c.fecha_entrega_real):''}</div>`}
   </div>`;
 }
 async function markEntregado(id_com){
@@ -2959,75 +3015,104 @@ async function intentarDisponible(cod){
 // ===================== CALENDARIO DE COMPROMISOS =====================
 function renderCalendario(tc){
   const hoy=today();
-  const esSuper=S.role==='supervisor';
-  const meses=esSuper?1:2;
+  const esSuper=S.role==='supervisor'||S.role==='planificador';
   const coms=visibleCompromisos();
-
-  // Agrupar por fecha
   const porFecha={};
-  coms.forEach(c=>{
-    if(!c.fecha_limite) return;
-    if(!porFecha[c.fecha_limite]) porFecha[c.fecha_limite]=[];
-    porFecha[c.fecha_limite].push(c);
-  });
+  coms.forEach(c=>{if(!c.fecha_limite)return;if(!porFecha[c.fecha_limite])porFecha[c.fecha_limite]=[];porFecha[c.fecha_limite].push(c);});
 
   let html='';
 
-  for(let m=0;m<meses;m++){
-    const ahora=new Date(hoy+'T12:00:00');
-    const mesDate=new Date(ahora.getFullYear(), ahora.getMonth()+m, 1);
-    const mesNom=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][mesDate.getMonth()];
-    const anio=mesDate.getFullYear();
-    const diasMes=new Date(anio,mesDate.getMonth()+1,0).getDate();
-    const primerDia=(mesDate.getDay()+6)%7;
-    const mesStr=`${anio}-${String(mesDate.getMonth()+1).padStart(2,'0')}`;
-    const comsMes=coms.filter(c=>c.fecha_limite&&c.fecha_limite.startsWith(mesStr));
-
-    html+=`<div class="card" style="margin-bottom:.65rem">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem">
-        <div style="font-weight:600;font-size:14px">${mesNom} ${anio}</div>
-        <div style="font-size:11px;color:var(--text2)">${comsMes.length} compromisos</div>
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:.3rem">
-        ${['L','M','X','J','V','S','D'].map(d=>`<div style="text-align:center;font-size:9px;color:var(--text3);font-weight:600;padding:.2rem 0">${d}</div>`).join('')}
-      </div>
-      <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
-        ${Array(primerDia).fill('<div></div>').join('')}
-        ${Array.from({length:diasMes},(_,i)=>{
-          const d=i+1;
-          const fecha=`${anio}-${String(mesDate.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-          const comsDia=porFecha[fecha]||[];
-          const esHoy=fecha===hoy;
-          const esPasado=fecha<hoy;
-          // Solo contar pendientes (no Entregado ni En Ruta)
-          const pendientes=comsDia.filter(c=>c.estado!=='Entregado');
-          const entregados=comsDia.filter(c=>c.estado==='Entregado');
-          const hayPendientes=pendientes.length>0;
-
-          let bg='transparent', col=esPasado?'var(--text3)':'var(--text)', border='transparent';
-          if(esHoy){bg='var(--acc2)';col='#fff';border='var(--acc2)';}
-          else if(comsDia.length>0){
-            if(esPasado&&hayPendientes){
-              // Pasado con pendientes → rojo
-              bg='rgba(239,68,68,.15)';col='var(--danger)';border='rgba(239,68,68,.3)';
-            } else if(esPasado&&!hayPendientes){
-              // Pasado todos entregados → verde
-              bg='rgba(16,185,129,.1)';col='var(--acc3)';border='rgba(16,185,129,.25)';
-            } else {
-              // Futuro con compromisos → azul/amarillo
-              bg=pendientes.length>=3?'rgba(245,158,11,.12)':'rgba(59,130,246,.1)';
-              col=pendientes.length>=3?'var(--acc)':'var(--acc2)';
-              border=pendientes.length>=3?'rgba(245,158,11,.3)':'rgba(59,130,246,.25)';
-            }
-          }
-          return `<div onclick="${comsDia.length?`verDiaCompromisos('${fecha}')`:''}" 
+  if(esSuper){
+    // Vista 3 semanas desde hoy
+    const {lun}=getWeekRange();
+    const semanas=[0,1,2];
+    const nomSem=['Esta semana','Próxima semana','En 2 semanas'];
+    semanas.forEach(s=>{
+      const lunSem=new Date(lun); lunSem.setDate(lun.getDate()+s*7);
+      const domSem=new Date(lunSem); domSem.setDate(lunSem.getDate()+6);
+      const dias=[];
+      for(let i=0;i<7;i++){
+        const d=new Date(lunSem); d.setDate(lunSem.getDate()+i);
+        const fecha=d.toISOString().split('T')[0];
+        const comsDia=porFecha[fecha]||[];
+        const esHoy=fecha===hoy;
+        const esPasado=fecha<hoy;
+        const pendientes=comsDia.filter(c=>c.estado!=='Entregado');
+        const hayPendientes=pendientes.length>0;
+        let bg='transparent',col=esPasado?'var(--text3)':'var(--text)',border='transparent';
+        if(esHoy){bg='var(--acc2)';col='#fff';border='var(--acc2)';}
+        else if(comsDia.length>0){
+          if(esPasado&&hayPendientes){bg='rgba(239,68,68,.15)';col='var(--danger)';border='rgba(239,68,68,.3)';}
+          else if(esPasado&&!hayPendientes){bg='rgba(16,185,129,.1)';col='var(--acc3)';border='rgba(16,185,129,.25)';}
+          else{bg=pendientes.length>=3?'rgba(245,158,11,.12)':'rgba(59,130,246,.1)';col=pendientes.length>=3?'var(--acc)':'var(--acc2)';border=pendientes.length>=3?'rgba(245,158,11,.3)':'rgba(59,130,246,.25)';}
+        }
+        dias.push({d,fecha,comsDia,esHoy,esPasado,pendientes,hayPendientes,bg,col,border});
+      }
+      const comsEnSem=dias.flatMap(d=>d.comsDia);
+      html+=`<div class="card" style="margin-bottom:.65rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem">
+          <div style="font-weight:600;font-size:13px">${nomSem[s]}</div>
+          <div style="font-size:11px;color:var(--text2)">${comsEnSem.length} compromisos</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:.3rem">
+          ${['L','M','X','J','V','S','D'].map(d=>`<div style="text-align:center;font-size:9px;color:var(--text3);font-weight:600;padding:.2rem 0">${d}</div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+          ${dias.map(({d,fecha,comsDia,esHoy,pendientes,hayPendientes,bg,col,border})=>`
+          <div onclick="${comsDia.length?`verDiaCompromisos('${fecha}')`:''}"
             style="text-align:center;padding:.3rem .1rem;border-radius:6px;cursor:${comsDia.length?'pointer':'default'};background:${bg};border:1px solid ${border}">
-            <div style="font-size:12px;font-weight:${esHoy||comsDia.length?'600':'400'};color:${col}">${d}</div>
-            ${comsDia.length?`<div style="font-size:8px;color:${col};font-family:var(--fm)">${hayPendientes?pendientes.length+'⏳':entregados.length+'✓'}</div>`:''}
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
+            <div style="font-size:9px;color:var(--text3)">${['L','M','X','J','V','S','D'][(d.getDay()+6)%7]}</div>
+            <div style="font-size:12px;font-weight:${esHoy||comsDia.length?'600':'400'};color:${col}">${d.getDate()}</div>
+            ${comsDia.length?`<div style="font-size:8px;color:${col};font-family:var(--fm)">${hayPendientes?pendientes.length+'⏳':comsDia.length+'✓'}</div>`:''}
+          </div>`).join('')}
+        </div>
+      </div>`;
+    });
+  } else {
+    // Vista por mes para admin/jefe (2 meses)
+    for(let m=0;m<2;m++){
+      const ahora=new Date(hoy+'T12:00:00');
+      const mesDate=new Date(ahora.getFullYear(), ahora.getMonth()+m, 1);
+      const mesNom=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'][mesDate.getMonth()];
+      const anio=mesDate.getFullYear();
+      const diasMes=new Date(anio,mesDate.getMonth()+1,0).getDate();
+      const primerDia=(mesDate.getDay()+6)%7;
+      const mesStr=`${anio}-${String(mesDate.getMonth()+1).padStart(2,'0')}`;
+      const comsMes=coms.filter(c=>c.fecha_limite&&c.fecha_limite.startsWith(mesStr));
+      html+=`<div class="card" style="margin-bottom:.65rem">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem">
+          <div style="font-weight:600;font-size:14px">${mesNom} ${anio}</div>
+          <div style="font-size:11px;color:var(--text2)">${comsMes.length} compromisos</div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:.3rem">
+          ${['L','M','X','J','V','S','D'].map(d=>`<div style="text-align:center;font-size:9px;color:var(--text3);font-weight:600;padding:.2rem 0">${d}</div>`).join('')}
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px">
+          ${Array(primerDia).fill('<div></div>').join('')}
+          ${Array.from({length:diasMes},(_,i)=>{
+            const d=i+1;
+            const fecha=`${anio}-${String(mesDate.getMonth()+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+            const comsDia=porFecha[fecha]||[];
+            const esHoy=fecha===hoy;
+            const esPasado=fecha<hoy;
+            const pendientes=comsDia.filter(c=>c.estado!=='Entregado');
+            const hayPendientes=pendientes.length>0;
+            let bg='transparent',col=esPasado?'var(--text3)':'var(--text)',border='transparent';
+            if(esHoy){bg='var(--acc2)';col='#fff';border='var(--acc2)';}
+            else if(comsDia.length>0){
+              if(esPasado&&hayPendientes){bg='rgba(239,68,68,.15)';col='var(--danger)';border='rgba(239,68,68,.3)';}
+              else if(esPasado&&!hayPendientes){bg='rgba(16,185,129,.1)';col='var(--acc3)';border='rgba(16,185,129,.25)';}
+              else{bg=pendientes.length>=3?'rgba(245,158,11,.12)':'rgba(59,130,246,.1)';col=pendientes.length>=3?'var(--acc)':'var(--acc2)';border=pendientes.length>=3?'rgba(245,158,11,.3)':'rgba(59,130,246,.25)';}
+            }
+            return `<div onclick="${comsDia.length?`verDiaCompromisos('${fecha}')`:''}"
+              style="text-align:center;padding:.3rem .1rem;border-radius:6px;cursor:${comsDia.length?'pointer':'default'};background:${bg};border:1px solid ${border}">
+              <div style="font-size:12px;font-weight:${esHoy||comsDia.length?'600':'400'};color:${col}">${d}</div>
+              ${comsDia.length?`<div style="font-size:8px;color:${col};font-family:var(--fm)">${hayPendientes?pendientes.length+'⏳':comsDia.length+'✓'}</div>`:''}
+            </div>`;
+          }).join('')}
+        </div>
+      </div>`;
+    }
   }
 
   // Lista de vencidos con pendientes
@@ -3114,16 +3199,24 @@ async function cambiarAreaEquipo(cod, nuevaArea){
 
 function renderCompromisos(tc){
   const hoy=today();
-  const coms=visibleCompromisos().sort((a,b)=>a.fecha_limite.localeCompare(b.fecha_limite));
+  // Admin ve todos, Jefe/Plan ve su sitio
+  const todos=S.role==='admin'?S.compromisos:visibleCompromisos();
+  const coms=todos.sort((a,b)=>{
+    if(!a.fecha_limite) return 1;
+    if(!b.fecha_limite) return -1;
+    return a.fecha_limite.localeCompare(b.fecha_limite);
+  });
   const pend=coms.filter(c=>c.estado!=='Entregado');
   const done=coms.filter(c=>c.estado==='Entregado');
-  const venc=pend.filter(c=>c.fecha_limite<hoy).length;
-  const prox=pend.filter(c=>{const d=Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000));return d>=0&&d<=3;}).length;
+  const venc=pend.filter(c=>c.fecha_limite&&c.fecha_limite<hoy).length;
+  const prox=pend.filter(c=>{if(!c.fecha_limite)return false;const d=Math.round((new Date(c.fecha_limite+'T12:00:00')-new Date(hoy+'T12:00:00'))/(86400000));return d>=0&&d<=7;}).length;
+  const sinFecha=pend.filter(c=>!c.fecha_limite).length;
   tc.innerHTML=`
-    ${venc||prox?`<div class="card" style="border-color:rgba(239,68,68,.3);margin-bottom:.65rem">
+    ${venc||prox||sinFecha?`<div class="card" style="border-color:rgba(239,68,68,.3);margin-bottom:.65rem">
       <div class="ct" style="color:var(--danger);margin-bottom:.3rem"><i class="ti ti-alert-triangle"></i> Atención</div>
-      ${venc?`<div style="font-size:12px;color:var(--danger)">${venc} equipo(s) con fecha límite vencida</div>`:''}
-      ${prox?`<div style="font-size:12px;color:var(--acc)">${prox} equipo(s) con entrega en ≤ 3 días</div>`:''}
+      ${venc?`<div style="font-size:12px;color:var(--danger)">${venc} equipo(s) con fecha vencida</div>`:''}
+      ${prox?`<div style="font-size:12px;color:var(--acc)">${prox} equipo(s) con entrega en ≤ 7 días</div>`:''}
+      ${sinFecha?`<div style="font-size:12px;color:#ef9f27">${sinFecha} equipo(s) sin fecha comprometida</div>`:''}
     </div>`:''}
     <div class="shd"><i class="ti ti-flag"></i> Pendientes (${pend.length})</div>
     ${pend.map(c=>comCard(c)).join('')||`<div class="es" style="padding:1rem"><i class="ti ti-check"></i>Sin entregas pendientes</div>`}
